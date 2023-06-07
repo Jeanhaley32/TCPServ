@@ -34,6 +34,20 @@ const (
 	Banner     = "TheVoid"
 )
 
+const (
+	corgi = "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣧⣼⣧⠀⠀⠀⠀⠀⠀\n" +
+		"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣭⣭⣤⣄⠀⠀⠀⠀\n" +
+		"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣷⣤⣤⡄\n" +
+		"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⣿⡿⠀\n" +
+		"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣼⣿⣮⣍⣉⣉⣀⣀⠀⠀⠀\n" +
+		"⠀⠀⣠⣶⣶⣶⣶⣶⣶⣶⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀\n" +
+		"⣴⣿⣿⣿⣿⣿⣯⡛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀\n" +
+		"⠉⣿⣿⣿⣿⣿⣿⣷⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠏⠀⠀\n" +
+		"⠀⣿⣿⣿⣿⣿⣿⡟⠸⠿⠿⠿⣿⣿⣿⣿⣿⣿⣿⠿⠋⠀⠀⠀\n" +
+		"⠀⠘⢿⣿⣿⠿⠋⠀⠀⠀⠀⠀⠀⠉⠉⣿⣿⡏⠁⠀⠀⠀⠀⠀\n" +
+		"⠀⠀⢸⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⡇⠀⠀⠀⠀⠀⠀\n"
+)
+
 // ___ Global Channel Variables ___
 // create a channel type with blank interface
 type ch chan message
@@ -424,6 +438,11 @@ func connHandler(conn ConnectionHandler) {
 		cmsg := []byte("")
 		// Respond to message object
 		switch {
+		case string(conn.LastMessage().GetPayload()) == "jen is a corgi":
+			Client.WriteToChannel(msg{
+				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "corgi"), conn.ConnectionId)),
+			}) // Logs corgi message to server
+			cmsg = []byte(corgi) // Sends a corgi back to user.
 		case string(conn.LastMessage().GetPayload()) == "ping":
 			Client.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "pong"), conn.ConnectionId)),
@@ -443,9 +462,11 @@ func connHandler(conn ConnectionHandler) {
 			cmsg = []byte("Message Received")
 		}
 		cmsg = append(cmsg, []byte("\n")...)
-		
-		for _, conn := range state.connections {
+
+		// Writes message to connection
+		for _, conn := range currentstate.connections {
 			conn.Write(&cmsg)
+		}
 	}
 }
 
