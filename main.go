@@ -443,7 +443,9 @@ func connHandler(conn ConnectionHandler) {
 			cmsg = []byte("Message Received")
 		}
 		cmsg = append(cmsg, []byte("\n")...)
-		conn.Write(&cmsg)
+		
+		for _, conn := range state.connections {
+			conn.Write(&cmsg)
 	}
 }
 
