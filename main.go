@@ -26,12 +26,15 @@ import (
 )
 
 const (
-	ip         = "127.0.0.1" // IP address
-	netp       = "tcp"       // network protocol
-	port       = "6000"      // Port to listen on
-	buffersize = 1024        // Message Buffer size.
-	loggerTime = 120         // time in between server status check, in seconds.
-	Banner     = "TheVoid"
+	ip                  = "127.0.0.1" // IP address
+	netp                = "tcp"       // network protocol
+	port                = "6000"      // Port to listen on
+	buffersize          = 1024        // Message Buffer size.
+	loggerTime          = 120         // time in between server status check, in seconds.
+	banner              = "TheVoid"   // Banner to display on startup
+	clientchannelbuffer = 20          // size of client channel buffer
+	logchannelbuffer    = 20          // size of log channel buffer
+	systemchannelbuffer = 20          // size of system channel buffer
 )
 
 const (
@@ -61,7 +64,7 @@ type termch chan interface{}
 //	error  - Error logs.
 //	sys		- System logs.
 var (
-	clientChan, errorChan, sysChan ch
+	clientChan, logChan, sysChan ch
 )
 
 // Defining type used to define a message route and purpose
@@ -92,7 +95,7 @@ func (m MsgEnumType) GetChannel() ch {
 	case Client:
 		return clientChan
 	case Error:
-		return errorChan
+		return logChan
 	case System:
 		return sysChan
 	}
@@ -150,7 +153,7 @@ func (c Color) Color() string {
 }
 
 var (
-	branding     = figure.NewColorFigure(Banner, "nancyj-fancy", "Blue", true)
+	branding     = figure.NewColorFigure(banner, "nancyj-fancy", "Blue", true)
 	currentstate state
 )
 
@@ -334,9 +337,9 @@ type message interface {
 
 func main() {
 	// instantiating global channels.
-	clientChan = make(chan message)
-	errorChan = make(chan message)
-	sysChan = make(chan message)
+	clientChan = make(chan message, clientchannelbuffer)
+	logChan = make(chan message, logchannelbuffer)
+	sysChan = make(chan message, systemchannelbuffer)
 	for _, v := range branding.Slicify() {
 		fmt.Println(colorWrap(Blue, v))
 		time.Sleep(100 * time.Millisecond)
@@ -489,7 +492,7 @@ func eventHandler() {
 			mwrap = colorWrap(Blue, msg.GetPayload().String())
 		case msg := <-sysChan:
 			mwrap = colorWrap(Yellow, msg.GetPayload().String())
-		case msg := <-errorChan:
+		case msg := <-logChan:
 			mwrap = colorWrap(Red, msg.GetPayload().String())
 		case <-time.After(loggerTime * time.Second):
 			// Log a message that no errors have occurred for loggerTime seconds
