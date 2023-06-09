@@ -475,6 +475,8 @@ func connHandler(conn ConnectionHandler) {
 					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1],
 					"", "Blue", true).String() +
 					"\n") // Sends an Ascii art version of user's message back to user.
+		default:
+			cmsg = conn.LastMessage().GetPayload()
 		}
 		cmsg = append(cmsg, []byte("\n")...)
 		Client.WriteToChannel(msg{
