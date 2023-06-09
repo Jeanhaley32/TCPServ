@@ -497,8 +497,9 @@ func MessageBroker() {
 	for {
 		select {
 		case msg := <-clientChan:
-			mwrap = colorWrap(Blue, msg.GetPayload().String()) // wraps message in color
-			if msg.GetDestination() == Global {                // if message is for all connections, write to all connections.
+			// mwrap = colorWrap(Blue, msg.GetPayload().String()) // wraps message in color
+			mwrap = "new message recieved"
+			if msg.GetDestination() == Global { // if message is for all connections, write to all connections.
 				for _, conn := range currentstate.connections {
 					conn.Write([]byte(mwrap))
 				}
