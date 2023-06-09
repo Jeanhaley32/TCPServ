@@ -500,7 +500,7 @@ func MessageBroker() {
 			mwrap = colorWrap(Blue, msg.GetPayload().String()) // wraps message in color
 			if msg.GetDestination() == Global {                // if message is for all connections, write to all connections.
 				for _, conn := range currentstate.connections {
-					conn.Write([]byte("Global Message\n"))
+					conn.Write([]byte(mwrap)
 				}
 			} else { // else write to specific connection.
 				for _, conn := range currentstate.connections {
