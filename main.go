@@ -407,10 +407,11 @@ func connListener() error {
 }
 
 // Connection Handler takes connections from listener, and processes read/writes
+// TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
 	branding := []byte(branding.ColorString()) // branding as a byte array
 	conn.Write(branding)                       // writes branding to connection
-	Client.WriteToChannel(msg{
+	System.WriteToChannel(msg{
 		payload: []byte(fmt.Sprintf("New connection from %v", conn.ConnectionId())),
 		msgType: Client,
 	}) // logs start of new session
