@@ -26,15 +26,15 @@ import (
 )
 
 const (
-	ip                  = "127.0.0.1" // IP address
-	netp                = "tcp"       // network protocol
-	port                = "6000"      // Port to listen on
-	buffersize          = 1024        // Message Buffer size.
-	loggerTime          = 120         // time in between server status check, in seconds.
-	banner              = "TheVoid"   // Banner to display on startup
-	clientchannelbuffer = 20          // size of client channel buffer
-	logchannelbuffer    = 20          // size of log channel buffer
-	systemchannelbuffer = 20          // size of system channel buffer
+	ip                  = "139.144.49.89" // IP address
+	netp                = "tcp"           // network protocol
+	port                = "6000"          // Port to listen on
+	buffersize          = 1024            // Message Buffer size.
+	loggerTime          = 120             // time in between server status check, in seconds.
+	banner              = "TheVoid"       // Banner to display on startup
+	clientchannelbuffer = 20              // size of client channel buffer
+	logchannelbuffer    = 20              // size of log channel buffer
+	systemchannelbuffer = 20              // size of system channel buffer
 )
 
 const (
