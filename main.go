@@ -458,8 +458,8 @@ func connHandler(conn ConnectionHandler) {
 			}) // Logs corgi message to server
 			cmsg = []byte(
 				figure.NewColorFigure(
-					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1], "", "Blue", true).String() 
-					+ corgi) // Sends a corgi back to user.
+					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1], "", "Blue", true).String() +
+					corgi) // Sends a corgi back to user.
 		case string(conn.LastMessage().GetPayload()) == "ping":
 			System.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "pong"), conn.ConnectionId)),
@@ -478,8 +478,8 @@ func connHandler(conn ConnectionHandler) {
 		}
 		cmsg = append(cmsg, []byte("\n")...)
 		Client.WriteToChannel(msg{
-			payload: cmsg,
-			msgType: Client,
+			payload:     cmsg,
+			msgType:     Client,
 			destination: Global,
 		}) // Writes message to client channel
 	}
