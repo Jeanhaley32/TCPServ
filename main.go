@@ -342,7 +342,10 @@ type message interface {
 }
 
 func main() {
+	// defining CLI flags
 	ip := flag.String("ip", "127.0.0.1", "IP for server to listen on")
+	flag.Parse()
+
 	// instantiating global channels.
 	clientChan = make(chan message, clientchannelbuffer)
 	logChan = make(chan message, logchannelbuffer)
