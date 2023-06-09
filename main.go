@@ -449,7 +449,7 @@ func connHandler(conn ConnectionHandler) {
 		System.WriteToChannel(msg{
 			payload: []byte(fmt.Sprintf("(%v)Received message: "+colorWrap(Purple, "%v"), conn.ConnectionId(), string(conn.LastMessage().GetPayload()))),
 		})
-		cmsg := []byte("")
+		cmsg := []byte("blank")
 		// Respond to message object
 		switch {
 		case string(conn.LastMessage().GetPayload()) == "corgi":
