@@ -12,6 +12,7 @@ package main
 // 			- use Bubbtletea to create a CLI interface for the server.
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -26,15 +27,14 @@ import (
 )
 
 const (
-	ip                  = "139.144.49.89" // IP address
-	netp                = "tcp"           // network protocol
-	port                = "6000"          // Port to listen on
-	buffersize          = 1024            // Message Buffer size.
-	loggerTime          = 120             // time in between server status check, in seconds.
-	banner              = "TheVoid"       // Banner to display on startup
-	clientchannelbuffer = 20              // size of client channel buffer
-	logchannelbuffer    = 20              // size of log channel buffer
-	systemchannelbuffer = 20              // size of system channel buffer
+	netp                = "tcp"     // network protocol
+	port                = "6000"    // Port to listen on
+	buffersize          = 1024      // Message Buffer size.
+	loggerTime          = 120       // time in between server status check, in seconds.
+	banner              = "TheVoid" // Banner to display on startup
+	clientchannelbuffer = 20        // size of client channel buffer
+	logchannelbuffer    = 20        // size of log channel buffer
+	systemchannelbuffer = 20        // size of system channel buffer
 )
 
 const (
@@ -342,6 +342,7 @@ type message interface {
 }
 
 func main() {
+	ip := flag.String("ip", "127.0.0.1", "IP for server to listen on")
 	// instantiating global channels.
 	clientChan = make(chan message, clientchannelbuffer)
 	logChan = make(chan message, logchannelbuffer)
@@ -357,14 +358,14 @@ func main() {
 		wg.Done()       // decrementing the counter when done
 	}()
 	go func() {
-		connListener()
+		connListener(*ip)
 		wg.Done() // decrementing the counter when done
 	}()
 	wg.Wait() // waiting for all goroutines to finish
 }
 
 // Connection Listener accepts and passes connections off to Connection Handler
-func connListener() error {
+func connListener(ip string) error {
 	// Create Listener bound to socket.
 	listener, err := net.Listen(netp, net.JoinHostPort(ip, port))
 	if err != nil {
@@ -430,7 +431,7 @@ func connHandler(conn ConnectionHandler) {
 		r, err := conn.Read(&buf) // Write Client message to buffer
 		if err != nil {
 			if err == io.EOF {
-				Client.WriteToChannel(msg{
+				System.WriteToChannel(msg{
 					payload: []byte(fmt.Sprintf("Received EOF from %v .", conn.ConnectionId())),
 				})
 				return
@@ -442,25 +443,28 @@ func connHandler(conn ConnectionHandler) {
 		conn.AppendHistory(msg{payload: buf[:r-1], t: time.Now()}) // saves client messgae to message history
 
 		// Logs message received
-		Client.WriteToChannel(msg{
+		System.WriteToChannel(msg{
 			payload: []byte(fmt.Sprintf("(%v)Received message: "+colorWrap(Purple, "%v"), conn.ConnectionId(), string(conn.LastMessage().GetPayload()))),
 		})
 		cmsg := []byte("")
 		// Respond to message object
 		switch {
-		case string(conn.LastMessage().GetPayload()) == "jen is a corgi":
-			Client.WriteToChannel(msg{
+		case string(conn.LastMessage().GetPayload()) == "corgi":
+			System.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "corgi"), conn.ConnectionId)),
 			}) // Logs corgi message to server
-			cmsg = []byte(corgi) // Sends a corgi back to user.
+			cmsg = []byte(
+				figure.NewColorFigure(
+					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1], "", "Blue", true).String() +
+					"\n" + corgi) // Sends a corgi back to user.
 		case string(conn.LastMessage().GetPayload()) == "ping":
-			Client.WriteToChannel(msg{
+			System.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "pong"), conn.ConnectionId)),
 			})
 			cmsg = []byte(colorWrap(Purple, "pong\n"))
 		// Catches "ascii:" and makes that ascii art.
 		case strings.Split(string(conn.LastMessage().GetPayload()), ":")[0] == "ascii":
-			Client.WriteToChannel(msg{
+			System.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)Returning Ascii Art.", port)),
 			}) // Logs ascii art message to server
 			cmsg = []byte(
@@ -468,15 +472,14 @@ func connHandler(conn ConnectionHandler) {
 					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1],
 					"", "Blue", true).String() +
 					"\n") // Sends an Ascii art version of user's message back to user.
-		default:
-			cmsg = []byte("Message Received")
 		}
 		cmsg = append(cmsg, []byte("\n")...)
-
-		// Writes message to connection
-		for _, conn := range currentstate.connections {
-			conn.Write(cmsg)
+		newMsg := msg{
+			payload:     cmsg,
+			msgType:     Client,
+			destination: Global,
 		}
+		Client.WriteToChannel(newMsg) // Writes message to client channel
 	}
 }
 
