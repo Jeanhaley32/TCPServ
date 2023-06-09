@@ -449,17 +449,14 @@ func connHandler(conn ConnectionHandler) {
 		System.WriteToChannel(msg{
 			payload: []byte(fmt.Sprintf("(%v)Received message: "+colorWrap(Purple, "%v"), conn.ConnectionId(), string(conn.LastMessage().GetPayload()))),
 		})
-		cmsg := []byte("blank")
+		var cmsg []byte
 		// Respond to message object
 		switch {
 		case string(conn.LastMessage().GetPayload()) == "corgi":
 			System.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "corgi"), conn.ConnectionId)),
 			}) // Logs corgi message to server
-			cmsg = []byte(
-				figure.NewColorFigure(
-					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1], "", "Blue", true).String() +
-					corgi) // Sends a corgi back to user.
+			cmsg = []byte(corgi) // Sends a corgi back to user.
 		case string(conn.LastMessage().GetPayload()) == "ping":
 			System.WriteToChannel(msg{
 				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "pong"), conn.ConnectionId)),
