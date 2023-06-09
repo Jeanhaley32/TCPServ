@@ -179,7 +179,7 @@ func (m MsgID) IdType() string {
 
 // Define Enum for noClient UID
 const (
-	noClient UID = 0
+	Global NID = 0
 )
 
 // Defines a bundle of channels used for a connections communications
@@ -219,8 +219,8 @@ func (c connection) Read(buf *[]byte) (int, error) {
 }
 
 // Writes to Connection handler Channel
-func (c *connection) Write(buf *[]byte) (int, error) {
-	return c.conn.Write(*buf)
+func (c *connection) Write(buf []byte) (int, error) {
+	return c.conn.Write(buf)
 }
 
 // Exposes net.Conn Close method
@@ -249,7 +249,7 @@ func (c *connection) generateUid() {
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
 	Read(buf *[]byte) (n int, err error)
-	Write(buf *[]byte) (n int, err error)
+	Write(buf []byte) (n int, err error)
 	Close() error
 	LastMessage() message
 	AppendHistory(message)
@@ -297,6 +297,11 @@ type msg struct {
 	msgType     MsgEnumType // Message type. Used to define message route.
 }
 
+// Get msg destionation
+func (m msg) GetDestination() NID {
+	return m.destination
+}
+
 // sets t to current time
 func (m *msg) setTime() {
 	m.t = time.Now()
@@ -329,6 +334,7 @@ func (m *msg) generateUid() {
 
 // Defines interface needed for message handler
 type message interface {
+	GetDestination() NID
 	GetPayload() payload
 	Timestamp() timestamp
 	GetId() MsgID
@@ -347,8 +353,8 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2) // adding two goroutines
 	go func() {
-		eventHandler() // starting the Event Handler go routine
-		wg.Done()      // decrementing the counter when done
+		MessageBroker() // starting the Event Handler go routine
+		wg.Done()       // decrementing the counter when done
 	}()
 	go func() {
 		connListener()
@@ -403,7 +409,7 @@ func connListener() error {
 // Connection Handler takes connections from listener, and processes read/writes
 func connHandler(conn ConnectionHandler) {
 	branding := []byte(branding.ColorString()) // branding as a byte array
-	conn.Write(&branding)                      // writes branding to connection
+	conn.Write(branding)                       // writes branding to connection
 	Client.WriteToChannel(msg{
 		payload: []byte(fmt.Sprintf("New connection from %v", conn.ConnectionId())),
 		msgType: Client,
@@ -468,19 +474,15 @@ func connHandler(conn ConnectionHandler) {
 
 		// Writes message to connection
 		for _, conn := range currentstate.connections {
-			conn.Write(&cmsg)
+			conn.Write(cmsg)
 		}
 	}
 }
 
-// Event Handler handles events such as connection shutdowns and error logging.
-// TODO (jeanhaley): At the moment, this handler really just reads from channels
-// and logs messages to the console. It's more of a placeholder for something more
-// robust.
-// The current plan is to replae this with three seperate things. A Message broker that handles
-// the routing of messages, a screenwriter that prints server state to the screen, and a log route
-// that ingests logs, sorts them, and writes them to log files.
-func eventHandler() {
+// MessageBroker is used to handle messages from the three global channels.
+// It is responsible for writing messages to the appropriate connections.
+// It is also responsible for logging messages to the console.
+func MessageBroker() {
 	// Create a custom logger
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	mwrap := ""
@@ -489,7 +491,18 @@ func eventHandler() {
 	for {
 		select {
 		case msg := <-clientChan:
-			mwrap = colorWrap(Blue, msg.GetPayload().String())
+			mwrap = colorWrap(Blue, msg.GetPayload().String()) // wraps message in color
+			if msg.GetDestination() == Global {                // if message is for all connections, write to all connections.
+				for _, conn := range currentstate.connections {
+					conn.Write([]byte(mwrap))
+				}
+			} else { // else write to specific connection.
+				for _, conn := range currentstate.connections {
+					if conn.ConnectionId() == msg.GetDestination() {
+						conn.Write([]byte(mwrap))
+					}
+				}
+			}
 		case msg := <-sysChan:
 			mwrap = colorWrap(Yellow, msg.GetPayload().String())
 		case msg := <-logChan:
@@ -506,7 +519,7 @@ func eventHandler() {
 	}
 }
 
-// wraps strings in colors.
+// colorWrap wraps a string in a color
 func colorWrap(c Color, m string) string {
 	const Reset = "\033[0m"
 	return c.Color() + m + Reset
