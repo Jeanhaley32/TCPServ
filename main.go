@@ -253,27 +253,21 @@ func (c connection) LastMessage() msg {
 // message type, message id, and message timestamp.
 
 func (c connection) ReadMsg() (msg, error) {
-	fmt.Println("starting message reader")
 	var buf = make([]byte, buffersize)
 
 	// route is a struct used to define a message route.
 	route := struct{ source, destination NID }{
 		source:      c.GetConnectionId(),
 		destination: Global}
-	fmt.Printf("source: %v, destination: %v\n", route.source, route.destination)
 	n, err := c.conn.Read(buf)
 	if err != nil {
 		return msg{payload: buf}, err
 	}
-	fmt.Println("Creating a new message")
 	m, err := InitMsg(buf[:n], Client, route)
 	if err != nil {
 		return m, err
 	}
-	fmt.Println("Messagae created, appending to history")
 	c.AppendHistory(m)
-	fmt.Println("Appended message to history. returning message")
-
 	return m, nil
 }
 
@@ -579,7 +573,6 @@ func connHandler(conn ConnectionHandler) {
 	}()
 	for {
 		m, err := conn.ReadMsg() // read message from connection
-		fmt.Println("Obtained Message.")
 		if err != nil {
 			if err == io.EOF {
 				System.WriteToChannel(msg{
@@ -629,7 +622,7 @@ func MessageBroker() {
 		select {
 		case msg := <-clientChan:
 			currentstate.WriteMessage(msg)
-			logger.Printf("(%v)Received: %v\n", msg.GetSource(), msg.GetPayload())
+			logger.Printf("(%v)Received: %v\n", msg.GetSource(), msg.ColorWrap())
 		case msg := <-sysChan:
 			logger.Println(msg.GetPayload())
 		case msg := <-logChan:
@@ -644,7 +637,7 @@ func MessageBroker() {
 				msgType:     System,
 				destination: Global,
 			}
-			fmt.Printf("Time hit %v message from time.After", msg.GetPayload().String())
+			logger.Println(msg.ColorWrap())
 		}
 	}
 }
