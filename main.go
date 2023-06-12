@@ -253,6 +253,7 @@ func (c connection) LastMessage() msg {
 // message type, message id, and message timestamp.
 
 func (c connection) ReadMsg() (msg, error) {
+	fmt.Println("starting message reader")
 	var buf = make([]byte, buffersize)
 
 	// route is a struct used to define a message route.
@@ -264,11 +265,14 @@ func (c connection) ReadMsg() (msg, error) {
 	if err != nil {
 		return msg{payload: buf}, err
 	}
+	fmt.Println("Creating a new message")
 	m, err := InitMsg(buf[:n], Client, route)
 	if err != nil {
 		return m, err
 	}
+	fmt.Println("Messagae created, appending to history")
 	c.AppendHistory(m)
+	fmt.Println("Appended message to history. returning message")
 
 	return m, nil
 }
@@ -455,7 +459,7 @@ func InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) (
 	m.SetType(t)
 	fmt.Println("set type")
 	fmt.Println("returning msg")
-	fmt.Printf("%+v\n", m)
+	fmt.Printf("contents of message:\n%+v\n", m)
 	return m, nil
 }
 
