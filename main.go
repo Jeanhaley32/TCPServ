@@ -431,7 +431,7 @@ func (m *msg) InitMsg(b []byte, t MsgEnumType, route struct{ source, destination
 	if route.destination != 0 {
 		fmt.Println("destination is not 0")
 		m.destination = route.destination
-		fmt.Println("finished setting destination)
+		fmt.Println("finished setting destination")
 	} else {
 		fmt.Println("destination is 0")
 		m.destination = Global
