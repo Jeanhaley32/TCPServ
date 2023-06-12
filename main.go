@@ -455,6 +455,7 @@ func InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) (
 	m.SetType(t)
 	fmt.Println("set type")
 	fmt.Println("returning msg")
+	fmt.Printf("%+v\n", m)
 	return m, nil
 }
 
