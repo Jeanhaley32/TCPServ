@@ -45,10 +45,14 @@ const (
 var (
 	ip, netp, port, banner                                                            string
 	buffersize, logerTime, clientchannelbuffer, logchannelbuffer, systemchannelbuffer int
+	clientChan, logChan, sysChan                                                      ch // Global Channels
+	currentstate                                                                      state
 )
 
 var (
-	clientChan, logChan, sysChan ch // Global Channels
+	// creating a blank global branding variable.
+	// this needs to be done, because the type figure.figure is not exported.
+	branding = figure.NewColorFigure("", "nancyj-fancy", "Blue", true)
 )
 
 // uses init function to set set up global flag variables, and channels.
@@ -68,6 +72,8 @@ func init() {
 	clientChan = make(chan message, clientchannelbuffer)
 	logChan = make(chan message, logchannelbuffer)
 	sysChan = make(chan message, systemchannelbuffer)
+	branding = figure.NewColorFigure(banner, "nancyj-fancy", "Blue", true) // sets banner to value passed by terminal flags.
+
 }
 
 // ___ Global Channel Variables ___
@@ -128,7 +134,6 @@ func (m MsgEnumType) GetChannel() ch {
 // Writes message to channel based on msg type.
 func (m MsgEnumType) WriteToChannel(a message) {
 	a.SetType(m)
-	fmt.Printf("%v\n", m.Type().String())
 	m.GetChannel() <- a
 }
 
@@ -175,11 +180,6 @@ func (c Color) Color() string {
 	}
 	return ""
 }
-
-var (
-	branding     = figure.NewColorFigure(banner, "nancyj-fancy", "Blue", true)
-	currentstate state
-)
 
 type timestamp string
 
@@ -394,6 +394,12 @@ type message interface {
 	GetTimestamp() timestamp // returns timestamp
 	GetId() MsgID            // returns message id
 	GetMsgType() MsgEnumType // returns message type
+	GetSource() NID          // returns message source
+}
+
+// returns source of message
+func (m msg) GetSource() NID {
+	return m.source
 }
 
 // wraps payload in color based on message type
@@ -555,9 +561,7 @@ func connListener(ip string) error {
 // Connection Handler takes connections from listener, and processes read/writes
 // TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
-	// make a
-	branding := payload(branding.ColorString())
-	conn.Write(&msg{payload: branding}) // writes branding to connection
+	conn.Write(&msg{payload: payload(branding.ColorString())}) // writes branding to connection
 	System.WriteToChannel(&msg{
 		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
 		msgType: System,
@@ -623,12 +627,15 @@ func MessageBroker() {
 	for {
 		select {
 		case msg := <-clientChan:
-			msg.ColorWrap()                // wraps payload in color based on message type
-			currentstate.WriteMessage(msg) // Write message to appropriate destination.
+			msg.ColorWrap()
+			currentstate.WriteMessage(msg)
+			logger.Printf("(%v)Received: %v\n", msg.GetSource(), msg.GetPayload())
 		case msg := <-sysChan:
-			msg.ColorWrap() // wraps payload in color based on message type
+			msg.ColorWrap()
+			logger.Println(msg.GetPayload())
 		case msg := <-logChan:
-			msg.ColorWrap() // wraps payload in color based on message type
+			msg.ColorWrap()
+			logger.Println(msg.GetPayload())
 		case <-time.After(time.Second * time.Duration(logerTime)):
 			// Log a message that no errors have occurred for loggerTime seconds
 			msg := msg{
@@ -639,7 +646,7 @@ func MessageBroker() {
 				msgType:     System,
 				destination: Global,
 			}
-			msg.ColorWrap() // wraps payload in color based on message type
+			fmt.Printf("Time hit %v message from time.After", msg.GetPayload().String())
 		}
 	}
 }
