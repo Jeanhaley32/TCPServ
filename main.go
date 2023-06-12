@@ -624,11 +624,11 @@ func MessageBroker() {
 		select {
 		case msg := <-clientChan:
 			currentstate.WriteMessage(msg)
-			logger.Printf("(%v)Received: %v\n", msg.GetSource(), msg.ColorWrap())
+			logger.Printf("(%v)Received payload: %v", msg.GetSource(), msg.ColorWrap())
 		case msg := <-sysChan:
-			logger.Println(msg.GetPayload())
+			logger.Println(msg.ColorWrap())
 		case msg := <-logChan:
-			logger.Println(msg.GetPayload())
+			logger.Println(msg.ColorWrap())
 		case <-time.After(time.Second * time.Duration(logerTime)):
 			// Log a message that no errors have occurred for loggerTime seconds
 			msg := msg{
