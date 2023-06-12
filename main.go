@@ -596,8 +596,10 @@ func connHandler(conn ConnectionHandler) {
 		switch {
 		case m.GetPayload().String() == "corgi":
 			m.SetPayload(payload(corgi))
+			Client.WriteToChannel(m)
 		case m.GetPayload().String() == "ping":
 			m.SetPayload(payload("pong"))
+			Client.WriteToChannel(m)
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
 			m.SetPayload(
 				payload(
@@ -605,8 +607,8 @@ func connHandler(conn ConnectionHandler) {
 						m.GetPayload().String(),
 						"nancyj-fancy",
 						"Green", true).ColorString())) // sets payload to ascii art
+			Client.WriteToChannel(m) // write message to Client Channel
 		}
-		Client.WriteToChannel(m) // write message to Client Channel
 	}
 }
 
