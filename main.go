@@ -376,6 +376,7 @@ type msg struct {
 type message interface {
 	ColorWrap() string       // returns color wraped payload
 	SetSource(NID)           // sets message source
+	SetDesitnation(NID)      // sets message destination
 	SetType(MsgEnumType)     // sets message type
 	SetPayload(payload)      // sets message payload
 	GetDestination() NID     // returns destination
@@ -389,6 +390,11 @@ type message interface {
 // returns source of message
 func (m msg) GetSource() NID {
 	return m.source
+}
+
+// Sets msg destination
+func (m *msg) SetDestination(n NID) {
+	m.destination = n
 }
 
 // wraps payload in color based on message type
@@ -424,28 +430,31 @@ func (m *msg) SetSource(n NID) {
 //	sets message type.
 func InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) (msg, error) {
 	// if destination is not 0, set destination to destination
-	fmt.Println("parsing destinations object.")
-	m := msg{}
-	if route.destination != 0 {
-		fmt.Println("destination is not 0")
-		m.destination = route.destination
-		fmt.Println("finished setting destination")
-	} else {
-		fmt.Println("destination is 0")
-		m.destination = Global
-	}
-	fmt.Println("Finished Parsing destinations object.")
-
 	// If source is not provided, return an error.
 	if route.source == 0 {
-		return m, fmt.Errorf("source not provided")
+		return msg{}, fmt.Errorf("source not provided")
 	}
-	m.source = route.source
-	m.generateUid()
-	m.setTime()
-	m.payload = b
-	m.msgType = t
+	destination := Global
+	if route.destination != 0 {
+		destination = route.destination
+	}
 
+	m := msg{}
+	fmt.Println("created new msg object")
+	m.SetSource(route.source)
+	fmt.Println("set source")
+	m.SetDestination(destination)
+	fmt.Println("set destination")
+
+	m.generateUid()
+	fmt.Println("generated uid")
+	m.setTime()
+	fmt.Println("set time")
+	m.SetPayload(payload(b))
+	fmt.Println("set payload")
+	m.SetType(t)
+	fmt.Println("set type")
+	fmt.Println("returning msg")
 	return m, nil
 }
 
