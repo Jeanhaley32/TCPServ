@@ -608,7 +608,7 @@ func connHandler(conn ConnectionHandler) {
 					figure.NewColorFigure(
 						strings.Split(m.GetPayload().String(), ":")[1],
 						"nancyj-fancy",
-						"Green", false).ColorString())) // sets payload to ascii art
+						"Green", true).ColorString())) // sets payload to ascii art
 			Client.WriteToChannel(m) // write message to Client Channel
 		}
 	}
