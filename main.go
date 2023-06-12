@@ -252,16 +252,7 @@ func (c connection) LastMessage() message {
 // uses initMsg to initialize message object, which sets
 // message type, message id, and message timestamp.
 
-func (c connection) ReadMsg(t ...MsgEnumType) (message, error) {
-	// if no message type is passed, we default to Client.
-	// This may not be necessary, since really anything read from a connection is a client message.
-	// But, I am leaving it in for now.
-	if len(t) > 1 {
-		return nil, fmt.Errorf("too many arguments") // TODO(jeanhaley) Create a method for packaging errors in a message object
-	}
-	if len(t) == 0 {
-		t = append(t, Client)
-	}
+func (c connection) ReadMsg() (message, error) {
 	var (
 		buf = make([]byte, buffersize)
 		m   *msg
@@ -276,7 +267,7 @@ func (c connection) ReadMsg(t ...MsgEnumType) (message, error) {
 		return m, err
 	}
 
-	m.InitMsg(buf[:n], t[0], route)
+	m.InitMsg(buf[:n], Client, route)
 	c.AppendHistory(m)
 	return m, nil
 }
