@@ -419,18 +419,23 @@ func (m *msg) SetSource(n NID) {
 	m.source = n
 }
 
-// initialies a message object
-// generates a unique message id
-// sets time to current time
-// sets payload to byte array
-// sets message type.
+// initializes a message object
+//
+//	generates a unique message id
+//	sets time to current time
+//	sets payload to byte array
+//	sets message type.
 func (m *msg) InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) error {
 	// if destination is not 0, set destination to destination
+	fmt.Println("parsing destinations object.")
 	if route.destination != 0 {
+		fmt.Println("destination is not 0")
 		m.destination = route.destination
 	} else {
+		fmt.Println("destination is 0")
 		m.destination = Global
 	}
+	fmt.Println("Finished Parsing destinations object.")
 
 	// If source is not provided, return an error.
 	if route.source == 0 {
