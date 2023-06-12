@@ -41,25 +41,33 @@ const (
 )
 
 // ___ Global Variables ___
+
 var (
-	netp, port, banner, ip                                                            string
-	buffersize, clientchannelbuffer, logchannelbuffer, systemchannelbuffer, logerTime int
-	clientChan, logChan, sysChan                                                      ch // Global Channels
+	ip, netp, port, banner                                                            string
+	buffersize, logerTime, clientchannelbuffer, logchannelbuffer, systemchannelbuffer int
 )
 
-// Sets Flag Variables
-func setFlags() {
-	ip = *flag.String("ip", "127.0.0.1", "IP for server to listen on")
-	netp = *flag.String("netp", "tcp", "Network protocol to use")
-	port = *flag.String("port", "6000", "Port for server to listen on")
-	buffersize = *flag.Int("buffersize", 1024, "Message Buffer size.")
-	logerTime = *flag.Int("logtime", 120, "time in between server status check, in seconds.")
-	banner = *flag.String("banner", "TheVoid", "Banner to display on startup")
-	clientchannelbuffer = *flag.Int("clientchannelbuffer", 20, "size of client channel buffer")
-	logchannelbuffer = *flag.Int("logchannelbuffer", 20, "size of log channel buffer")
-	systemchannelbuffer = *flag.Int("systemchannelbuffer", 20, "size of system channel buffer")
+var (
+	clientChan, logChan, sysChan ch // Global Channels
+)
 
+// uses init function to set set up global flag variables, and channels.
+func init() {
+	// setting Global Flags
+	flag.StringVar(&ip, "ip", "127.0.0.1", "IP for server to listen on")
+	flag.StringVar(&netp, "netp", "tcp", "Network protocol to use")
+	flag.StringVar(&port, "port", "6000", "Port for server to listen on")
+	flag.IntVar(&buffersize, "bufferSize", 1024, "Message Buffer size.")
+	flag.IntVar(&logerTime, "logerTime", 120, "time in between server status check, in seconds.")
+	flag.StringVar(&banner, "banner", "TheVoid", "Banner to display on startup")
+	flag.IntVar(&clientchannelbuffer, "clientchannelbuffer", 20, "size of client channel buffer")
+	flag.IntVar(&logchannelbuffer, "logchannelbuffer", 20, "size of log channel buffer")
+	flag.IntVar(&systemchannelbuffer, "systemchannelbuffer", 20, "size of system channel buffer")
 	flag.Parse()
+	// instantiating global channels.
+	clientChan = make(chan message, clientchannelbuffer)
+	logChan = make(chan message, logchannelbuffer)
+	sysChan = make(chan message, systemchannelbuffer)
 }
 
 // ___ Global Channel Variables ___
@@ -91,6 +99,19 @@ func (m MsgEnumType) Type() MsgEnumType {
 	return System
 }
 
+// returns MsgEnumType as a string
+func (m MsgEnumType) String() string {
+	switch m {
+	case Client:
+		return "Client"
+	case Error:
+		return "Error"
+	case System:
+		return "System"
+	}
+	return "System"
+}
+
 // Returns Global message routing channel based on msg type
 func (m MsgEnumType) GetChannel() ch {
 	switch m {
@@ -107,6 +128,7 @@ func (m MsgEnumType) GetChannel() ch {
 // Writes message to channel based on msg type.
 func (m MsgEnumType) WriteToChannel(a message) {
 	a.SetType(m)
+	fmt.Printf("%v\n", m.Type().String())
 	m.GetChannel() <- a
 }
 
@@ -470,12 +492,6 @@ func (m *msg) generateUid() {
 
 func main() {
 
-	setFlags() // setting flags
-
-	// instantiating global channels.
-	clientChan = make(chan message, clientchannelbuffer)
-	logChan = make(chan message, logchannelbuffer)
-	sysChan = make(chan message, systemchannelbuffer)
 	for _, v := range branding.Slicify() {
 		fmt.Println(colorWrap(Blue, v))
 		time.Sleep(100 * time.Millisecond)
