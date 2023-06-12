@@ -270,6 +270,7 @@ func (c connection) ReadMsg(t ...MsgEnumType) (message, error) {
 	route := struct{ source, destination NID }{
 		source:      c.GetConnectionId(),
 		destination: Global}
+	fmt.Printf("source: %v, destination: %v\n", route.source, route.destination)
 	n, err := c.conn.Read(buf)
 	if err != nil {
 		return m, err
