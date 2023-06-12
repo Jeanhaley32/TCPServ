@@ -253,10 +253,8 @@ func (c connection) LastMessage() message {
 // message type, message id, and message timestamp.
 
 func (c connection) ReadMsg() (message, error) {
-	var (
-		buf = make([]byte, buffersize)
-		m   msg
-	)
+	var buf = make([]byte, buffersize)
+	m := &msg{}
 	// route is a struct used to define a message route.
 	route := struct{ source, destination NID }{
 		source:      c.GetConnectionId(),
@@ -264,12 +262,12 @@ func (c connection) ReadMsg() (message, error) {
 	fmt.Printf("source: %v, destination: %v\n", route.source, route.destination)
 	n, err := c.conn.Read(buf)
 	if err != nil {
-		return &m, err
+		return m, err
 	}
 
 	m.InitMsg(buf[:n], Client, route)
-	c.AppendHistory(&m)
-	return &m, nil
+	c.AppendHistory(m)
+	return m, nil
 }
 
 // Writes to Connection handler Channel
