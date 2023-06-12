@@ -224,7 +224,7 @@ type connection struct {
 
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
-	ReadMsg() (message, error)        // reads from connection, and returns a constructed message
+	ReadMsg() (msg, error)            // reads from connection, and returns a constructed message
 	Write(message) (n int, err error) // Writes to Connection handler Channel
 	Close() error                     // Exposes net.Conn Close method
 	LastMessage() message             // Returns last message bundled in messageHistory
@@ -252,7 +252,7 @@ func (c connection) LastMessage() message {
 // uses initMsg to initialize message object, which sets
 // message type, message id, and message timestamp.
 
-func (c connection) ReadMsg() (message, error) {
+func (c connection) ReadMsg() (msg, error) {
 	var buf = make([]byte, buffersize)
 	m := &msg{}
 	// route is a struct used to define a message route.
@@ -267,7 +267,7 @@ func (c connection) ReadMsg() (message, error) {
 
 	m.InitMsg(buf[:n], Client, route)
 	c.AppendHistory(m)
-	return m, nil
+	return *m, nil
 }
 
 // Writes to Connection handler Channel
