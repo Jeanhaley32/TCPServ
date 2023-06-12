@@ -496,6 +496,7 @@ func main() {
 		fmt.Println(colorWrap(Blue, v))
 		time.Sleep(100 * time.Millisecond)
 	}
+	fmt.Print(corgi)
 	var wg sync.WaitGroup
 	wg.Add(2) // adding two goroutines
 	go func() {
@@ -601,13 +602,16 @@ func connHandler(conn ConnectionHandler) {
 			m.SetPayload(payload("pong"))
 			Client.WriteToChannel(m)
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
+			fmt.Println("caught ascii")
 			m.SetPayload(
 				payload(
 					figure.NewColorFigure(
 						m.GetPayload().String(),
 						"nancyj-fancy",
-						"Green", true).ColorString())) // sets payload to ascii art
+						"Green", false).ColorString())) // sets payload to ascii art
+			fmt.Println("set Payload")
 			Client.WriteToChannel(m) // write message to Client Channel
+			fmt.Println("wrote to client channel")
 		}
 	}
 }
