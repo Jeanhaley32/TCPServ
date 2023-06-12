@@ -224,12 +224,12 @@ type connection struct {
 
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
-	ReadMsg(...MsgEnumType) (message, error) // reads from connection, and returns a constructed message
-	Write(message) (n int, err error)        // Writes to Connection handler Channel
-	Close() error                            // Exposes net.Conn Close method
-	LastMessage() message                    // Returns last message bundled in messageHistory
-	AppendHistory(message)                   // Appends message to message history
-	GetConnectionId() NID                    // exposes ConnectionId
+	ReadMsg() (message, error)        // reads from connection, and returns a constructed message
+	Write(message) (n int, err error) // Writes to Connection handler Channel
+	Close() error                     // Exposes net.Conn Close method
+	LastMessage() message             // Returns last message bundled in messageHistory
+	AppendHistory(message)            // Appends message to message history
+	GetConnectionId() NID             // exposes ConnectionId
 }
 
 // initializes connection object
