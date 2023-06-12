@@ -69,16 +69,16 @@ func init() {
 	flag.IntVar(&systemchannelbuffer, "systemchannelbuffer", 20, "size of system channel buffer")
 	flag.Parse()
 	// instantiating global channels.
-	clientChan = make(chan message, clientchannelbuffer)
-	logChan = make(chan message, logchannelbuffer)
-	sysChan = make(chan message, systemchannelbuffer)
+	clientChan = make(chan msg, clientchannelbuffer)
+	logChan = make(chan msg, logchannelbuffer)
+	sysChan = make(chan msg, systemchannelbuffer)
 	branding = figure.NewColorFigure(banner, "nancyj-fancy", "Blue", true) // sets banner to value passed by terminal flags.
 
 }
 
 // ___ Global Channel Variables ___
 // create a channel type with blank interface
-type ch chan message
+type ch chan msg
 
 // create a Termination channel type with blank interface
 type termch chan interface{}
@@ -132,7 +132,7 @@ func (m MsgEnumType) GetChannel() ch {
 }
 
 // Writes message to channel based on msg type.
-func (m MsgEnumType) WriteToChannel(a message) {
+func (m MsgEnumType) WriteToChannel(a msg) {
 	a.SetType(m)
 	m.GetChannel() <- a
 }
@@ -215,7 +215,7 @@ type cnchanbundle struct {
 
 // Connection object, represent a connection to the server.
 type connection struct {
-	messageHistory []message    // Message History
+	messageHistory []msg        // Message History
 	connectionId   NID          // Unique Identifier for connection
 	conn           net.Conn     // connection objct
 	chbundle       cnchanbundle // bundle of channels used for connections communications.
@@ -224,26 +224,26 @@ type connection struct {
 
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
-	ReadMsg() (msg, error)            // reads from connection, and returns a constructed message
-	Write(message) (n int, err error) // Writes to Connection handler Channel
-	Close() error                     // Exposes net.Conn Close method
-	LastMessage() message             // Returns last message bundled in messageHistory
-	AppendHistory(message)            // Appends message to message history
-	GetConnectionId() NID             // exposes ConnectionId
+	ReadMsg() (msg, error)        // reads from connection, and returns a constructed message
+	Write(msg) (n int, err error) // Writes to Connection handler Channel
+	Close() error                 // Exposes net.Conn Close method
+	LastMessage() msg             // Returns last message bundled in messageHistory
+	AppendHistory(msg)            // Appends message to message history
+	GetConnectionId() NID         // exposes ConnectionId
 }
 
 // initializes connection object
 func initConnection(c *connection, conn net.Conn) {
 	c.startTime = time.Now()
-	c.chbundle.conn = make(chan message, 20)
-	c.chbundle.ingest = make(chan message, 20)
+	c.chbundle.conn = make(chan msg, 20)
+	c.chbundle.ingest = make(chan msg, 20)
 	c.chbundle.term = make(chan interface{})
 	c.conn = conn
 	c.generateUid()
 }
 
 // Returns last message bundled in messageHistory
-func (c connection) LastMessage() message {
+func (c connection) LastMessage() msg {
 	return c.messageHistory[len(c.messageHistory)-1]
 }
 
@@ -254,7 +254,7 @@ func (c connection) LastMessage() message {
 
 func (c connection) ReadMsg() (msg, error) {
 	var buf = make([]byte, buffersize)
-	m := &msg{}
+
 	// route is a struct used to define a message route.
 	route := struct{ source, destination NID }{
 		source:      c.GetConnectionId(),
@@ -262,16 +262,19 @@ func (c connection) ReadMsg() (msg, error) {
 	fmt.Printf("source: %v, destination: %v\n", route.source, route.destination)
 	n, err := c.conn.Read(buf)
 	if err != nil {
-		return *m, err
+		return msg{payload: buf}, err
 	}
-
-	m.InitMsg(buf[:n], Client, route)
+	m, err := InitMsg(buf[:n], Client, route)
+	if err != nil {
+		return m, err
+	}
 	c.AppendHistory(m)
-	return *m, nil
+
+	return m, nil
 }
 
 // Writes to Connection handler Channel
-func (c *connection) Write(m message) (int, error) {
+func (c *connection) Write(m msg) (int, error) {
 	return c.conn.Write(m.GetPayload())
 }
 
@@ -281,7 +284,7 @@ func (c *connection) Close() error {
 }
 
 // Appends message to message history
-func (c *connection) AppendHistory(m message) {
+func (c *connection) AppendHistory(m msg) {
 	c.messageHistory = append(c.messageHistory, m)
 }
 
@@ -311,7 +314,7 @@ type StateHandler interface {
 	WriteMessage(message) error // Writes message to connections based on message destination
 }
 
-func (s state) WriteMessage(m message) error {
+func (s state) WriteMessage(m msg) error {
 	// if message destination is global, we write to all connections
 	if m.GetDestination() == Global {
 		for _, c := range s.connections {
@@ -371,11 +374,7 @@ type msg struct {
 
 // Defines interface needed for message handler
 type message interface {
-	InitMsg(
-		[]byte,
-		MsgEnumType,
-		struct{ source, destination NID }) error // Initializes a message object
-	ColorWrap()              // wraps payload in color based on message type
+	ColorWrap() string       // returns color wraped payload
 	SetSource(NID)           // sets message source
 	SetType(MsgEnumType)     // sets message type
 	SetPayload(payload)      // sets message payload
@@ -393,7 +392,7 @@ func (m msg) GetSource() NID {
 }
 
 // wraps payload in color based on message type
-func (m *msg) ColorWrap() {
+func (m msg) ColorWrap() string {
 	var newPayload []byte
 	const reset = "\033[0m"
 	switch m.msgType {
@@ -404,7 +403,7 @@ func (m *msg) ColorWrap() {
 	case System:
 		newPayload = payload(Yellow.Color() + string(m.payload) + reset)
 	}
-	m.SetPayload(newPayload)
+	return string(newPayload)
 }
 
 // sets message type
@@ -423,9 +422,10 @@ func (m *msg) SetSource(n NID) {
 //	sets time to current time
 //	sets payload to byte array
 //	sets message type.
-func (m *msg) InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) error {
+func InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) (msg, error) {
 	// if destination is not 0, set destination to destination
 	fmt.Println("parsing destinations object.")
+	m := msg{}
 	if route.destination != 0 {
 		fmt.Println("destination is not 0")
 		m.destination = route.destination
@@ -438,7 +438,7 @@ func (m *msg) InitMsg(b []byte, t MsgEnumType, route struct{ source, destination
 
 	// If source is not provided, return an error.
 	if route.source == 0 {
-		return fmt.Errorf("source not provided")
+		return m, fmt.Errorf("source not provided")
 	}
 	m.source = route.source
 	m.generateUid()
@@ -446,7 +446,7 @@ func (m *msg) InitMsg(b []byte, t MsgEnumType, route struct{ source, destination
 	m.payload = b
 	m.msgType = t
 
-	return nil
+	return m, nil
 }
 
 // Get msg destionation
@@ -529,19 +529,19 @@ func connListener(ip string) error {
 			m.payload = []byte(fmt.Sprintf("Failed to Close Listener %q", err.Error()))
 			m.msgType = Error
 		}
-		m.msgType.WriteToChannel(&m)
+		m.msgType.WriteToChannel(m)
 	}()
 	// logs what socket the listener is bound to.
-	System.WriteToChannel(&msg{payload: []byte(fmt.Sprintf("Listener bound to %v", listener.Addr()))})
+	System.WriteToChannel(msg{payload: []byte(fmt.Sprintf("Listener bound to %v", listener.Addr()))})
 	// handles incoming connectons.
 	for {
 		// logs that we are waiting for a connection.
-		System.WriteToChannel(&msg{payload: []byte("Waiting for connection"), msgType: System})
+		System.WriteToChannel(msg{payload: []byte("Waiting for connection"), msgType: System})
 		// routine will hang here until a connection is accepted.
 		conn, err := listener.Accept()
 		if err != nil {
 			// if we fail to accept connection, we log the error and continue.
-			Error.WriteToChannel(&msg{payload: []byte(fmt.Sprintf("Failed to accept connection: %q", err.Error()))})
+			Error.WriteToChannel(msg{payload: []byte(fmt.Sprintf("Failed to accept connection: %q", err.Error()))})
 		}
 		// initializing connection object
 		newConn := connection{}
@@ -557,15 +557,15 @@ func connListener(ip string) error {
 // Connection Handler takes connections from listener, and processes read/writes
 // TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
-	conn.Write(&msg{payload: payload(branding.ColorString())}) // writes branding to connection
-	System.WriteToChannel(&msg{
+	conn.Write(msg{payload: payload(branding.ColorString())}) // writes branding to connection
+	System.WriteToChannel(msg{
 		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
 		msgType: System,
 	}) // logs start of new session
 
 	// defering closing function until we escape from session handler.
 	defer func() {
-		System.WriteToChannel(&msg{payload: []byte(fmt.Sprintf("Closing connection from %v", conn.GetConnectionId()))})
+		System.WriteToChannel(msg{payload: []byte(fmt.Sprintf("Closing connection from %v", conn.GetConnectionId()))})
 		// TODO(JeanHaley) Create a state handler(manager?) that can close this for us.
 		// we should send a signal through an explicit connection channel to
 		// the state handler that then tells it to close this connection and
@@ -577,22 +577,22 @@ func connHandler(conn ConnectionHandler) {
 		m, err := conn.ReadMsg() // read message from connection
 		if err != nil {
 			if err == io.EOF {
-				System.WriteToChannel(&msg{
+				System.WriteToChannel(msg{
 					payload: []byte(fmt.Sprintf("Received EOF from %v .", conn.GetConnectionId())),
 				})
 				return
 			} else {
-				Error.WriteToChannel(&msg{payload: []byte(err.Error())})
+				Error.WriteToChannel(msg{payload: []byte(err.Error())})
 				return
 			}
 		}
 		// Logs message received
-		System.WriteToChannel(&msg{
+		System.WriteToChannel(msg{
 			payload: []byte(fmt.Sprintf(
 				"(%v)Received message: "+
 					colorWrap(Purple, "%v"),
 				conn.GetConnectionId(),
-				string(conn.LastMessage().GetPayload()))),
+				string(conn.LastMessage().ColorWrap()))),
 		})
 		// Respond to message object
 		switch {
@@ -608,7 +608,7 @@ func connHandler(conn ConnectionHandler) {
 						"nancyj-fancy",
 						"Green", true).ColorString())) // sets payload to ascii art
 		}
-		Client.WriteToChannel(&m) // write message to Client Channel
+		Client.WriteToChannel(m) // write message to Client Channel
 	}
 }
 
@@ -623,14 +623,11 @@ func MessageBroker() {
 	for {
 		select {
 		case msg := <-clientChan:
-			msg.ColorWrap()
 			currentstate.WriteMessage(msg)
 			logger.Printf("(%v)Received: %v\n", msg.GetSource(), msg.GetPayload())
 		case msg := <-sysChan:
-			msg.ColorWrap()
 			logger.Println(msg.GetPayload())
 		case msg := <-logChan:
-			msg.ColorWrap()
 			logger.Println(msg.GetPayload())
 		case <-time.After(time.Second * time.Duration(logerTime)):
 			// Log a message that no errors have occurred for loggerTime seconds
