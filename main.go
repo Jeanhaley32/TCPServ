@@ -27,17 +27,6 @@ import (
 )
 
 const (
-	netp                = "tcp"     // network protocol
-	port                = "6000"    // Port to listen on
-	buffersize          = 1024      // Message Buffer size.
-	loggerTime          = 120       // time in between server status check, in seconds.
-	banner              = "TheVoid" // Banner to display on startup
-	clientchannelbuffer = 20        // size of client channel buffer
-	logchannelbuffer    = 20        // size of log channel buffer
-	systemchannelbuffer = 20        // size of system channel buffer
-)
-
-const (
 	corgi = "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣧⣼⣧⠀⠀⠀⠀⠀⠀\n" +
 		"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣭⣭⣤⣄⠀⠀⠀⠀\n" +
 		"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣷⣤⣤⡄\n" +
@@ -51,21 +40,34 @@ const (
 		"⠀⠀⢸⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⡇⠀⠀⠀⠀⠀⠀\n"
 )
 
+// ___ Global Variables ___
+var (
+	netp, port, banner, ip                                                            string
+	buffersize, clientchannelbuffer, logchannelbuffer, systemchannelbuffer, logerTime int
+	clientChan, logChan, sysChan                                                      ch // Global Channels
+)
+
+// Sets Flag Variables
+func setFlags() {
+	ip = *flag.String("ip", "127.0.0.1", "IP for server to listen on")
+	netp = *flag.String("netp", "tcp", "Network protocol to use")
+	port = *flag.String("port", "6000", "Port for server to listen on")
+	buffersize = *flag.Int("buffersize", 1024, "Message Buffer size.")
+	logerTime = *flag.Int("logtime", 120, "time in between server status check, in seconds.")
+	banner = *flag.String("banner", "TheVoid", "Banner to display on startup")
+	clientchannelbuffer = *flag.Int("clientchannelbuffer", 20, "size of client channel buffer")
+	logchannelbuffer = *flag.Int("logchannelbuffer", 20, "size of log channel buffer")
+	systemchannelbuffer = *flag.Int("systemchannelbuffer", 20, "size of system channel buffer")
+
+	flag.Parse()
+}
+
 // ___ Global Channel Variables ___
 // create a channel type with blank interface
 type ch chan message
 
 // create a Termination channel type with blank interface
 type termch chan interface{}
-
-// Define our three global log channels
-//
-//	client - Logs from individual connections.
-//	error  - Error logs.
-//	sys		- System logs.
-var (
-	clientChan, logChan, sysChan ch
-)
 
 // Defining type used to define a message route and purpose
 type MsgEnumType int64
@@ -104,6 +106,7 @@ func (m MsgEnumType) GetChannel() ch {
 
 // Writes message to channel based on msg type.
 func (m MsgEnumType) WriteToChannel(a message) {
+	a.SetType(m)
 	m.GetChannel() <- a
 }
 
@@ -164,7 +167,7 @@ type timestamp string
 type (
 	UID   uint32
 	NID   UID // Node ID
-	MsgID UID // Message ID
+	MsgID UID // Message I
 )
 
 // Returns message type as string
@@ -199,21 +202,21 @@ type connection struct {
 
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
-	Read() (message, error)
-	Write(buf []byte) (n int, err error)
-	Close() error
-	LastMessage() message
-	AppendHistory(message)
-	ConnectionId() NID
+	ReadMsg(...MsgEnumType) (message, error) // reads from connection, and returns a constructed message
+	Write(message) (n int, err error)        // Writes to Connection handler Channel
+	Close() error                            // Exposes net.Conn Close method
+	LastMessage() message                    // Returns last message bundled in messageHistory
+	AppendHistory(message)                   // Appends message to message history
+	GetConnectionId() NID                    // exposes ConnectionId
 }
 
 // initializes connection object
 func initConnection(c *connection, conn net.Conn) {
+	c.startTime = time.Now()
 	c.chbundle.conn = make(chan message, 20)
 	c.chbundle.ingest = make(chan message, 20)
 	c.chbundle.term = make(chan interface{})
 	c.conn = conn
-	c.startTime = time.Now()
 	c.generateUid()
 }
 
@@ -223,22 +226,41 @@ func (c connection) LastMessage() message {
 }
 
 // reads from connection, and returns a constructed message
-func (c connection) Read() (message, error) {
+// Take []byte from connection, and creates a message object.
+// uses initMsg to initialize message object, which sets
+// message type, message id, and message timestamp.
+
+func (c connection) ReadMsg(t ...MsgEnumType) (message, error) {
+	// if no message type is passed, we default to Client.
+	// This may not be necessary, since really anything read from a connection is a client message.
+	// But, I am leaving it in for now.
+	if len(t) > 1 {
+		return nil, fmt.Errorf("too many arguments") // TODO(jeanhaley) Create a method for packaging errors in a message object
+	}
+	if len(t) == 0 {
+		t = append(t, Client)
+	}
 	var (
 		buf = make([]byte, buffersize)
-		m   msg
+		m   *msg
 	)
+	// route is a struct used to define a message route.
+	route := struct{ source, destination NID }{
+		source:      c.GetConnectionId(),
+		destination: Global}
 	n, err := c.conn.Read(buf)
 	if err != nil {
-		return &m, err
+		return m, err
 	}
-	InitMsg(&m, buf[:n], Client)
-	return &m, nil
+
+	m.InitMsg(buf[:n], t[0], route)
+	c.AppendHistory(m)
+	return m, nil
 }
 
 // Writes to Connection handler Channel
-func (c *connection) Write(buf []byte) (int, error) {
-	return c.conn.Write(buf)
+func (c *connection) Write(m message) (int, error) {
+	return c.conn.Write(m.GetPayload())
 }
 
 // Exposes net.Conn Close method
@@ -252,7 +274,7 @@ func (c *connection) AppendHistory(m message) {
 }
 
 // exposes ConnectionId
-func (c connection) ConnectionId() NID {
+func (c connection) GetConnectionId() NID {
 	if c.connectionId == 0 {
 		return NID(0)
 	}
@@ -267,6 +289,36 @@ func (c *connection) generateUid() {
 // State is used to derive over-all state of connections
 type state struct {
 	connections []*connection
+}
+
+// defined state handler interface
+type StateHandler interface {
+	ActiveConnections() int     // Returns number of active connections
+	RemoveConnection(NID)       // Removes connection from state 'connections
+	AddConnection(*connection)  // Appends a new connection to state 'connections
+	WriteMessage(message) error // Writes message to connections based on message destination
+}
+
+func (s state) WriteMessage(m message) error {
+	// if message destination is global, we write to all connections
+	if m.GetDestination() == Global {
+		for _, c := range s.connections {
+			_, err := c.Write(m)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		for _, c := range s.connections {
+			if c.GetConnectionId() == m.GetDestination() {
+				_, err := c.Write(m)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (s *state) ActiveConnections() int {
@@ -307,12 +359,39 @@ type msg struct {
 
 // Defines interface needed for message handler
 type message interface {
+	InitMsg(
+		[]byte,
+		MsgEnumType,
+		struct{ source, destination NID }) error // Initializes a message object
+	ColorWrap()              // wraps payload in color based on message type
 	SetSource(NID)           // sets message source
+	SetType(MsgEnumType)     // sets message type
+	SetPayload(payload)      // sets message payload
 	GetDestination() NID     // returns destination
 	GetPayload() payload     // returns payload
 	GetTimestamp() timestamp // returns timestamp
 	GetId() MsgID            // returns message id
 	GetMsgType() MsgEnumType // returns message type
+}
+
+// wraps payload in color based on message type
+func (m *msg) ColorWrap() {
+	var newPayload []byte
+	const reset = "\033[0m"
+	switch m.msgType {
+	case Client:
+		newPayload = payload(Green.Color() + string(m.payload) + reset)
+	case Error:
+		newPayload = payload(Red.Color() + string(m.payload) + reset)
+	case System:
+		newPayload = payload(Yellow.Color() + string(m.payload) + reset)
+	}
+	m.SetPayload(newPayload)
+}
+
+// sets message type
+func (m *msg) SetType(t MsgEnumType) {
+	m.msgType = t
 }
 
 // sets message source
@@ -325,11 +404,25 @@ func (m *msg) SetSource(n NID) {
 // sets time to current time
 // sets payload to byte array
 // sets message type.
-func InitMsg(m *msg, b []byte, t MsgEnumType) {
+func (m *msg) InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) error {
+	// if destination is not 0, set destination to destination
+	if route.destination != 0 {
+		m.destination = route.destination
+	} else {
+		m.destination = Global
+	}
+
+	// If source is not provided, return an error.
+	if route.source == 0 {
+		return fmt.Errorf("source not provided")
+	}
+	m.source = route.source
 	m.generateUid()
 	m.setTime()
 	m.payload = b
 	m.msgType = t
+
+	return nil
 }
 
 // Get msg destionation
@@ -348,6 +441,11 @@ func (m *msg) setTime() {
 // Return payload
 func (m msg) GetPayload() payload {
 	return m.payload
+}
+
+// sets message payload
+func (m *msg) SetPayload(p payload) {
+	m.payload = p
 }
 
 // Returns Timestamp in Month/Day/Year Hour:Minute:Second format
@@ -371,9 +469,8 @@ func (m *msg) generateUid() {
 }
 
 func main() {
-	// defining CLI flags
-	ip := flag.String("ip", "127.0.0.1", "IP for server to listen on")
-	flag.Parse()
+
+	setFlags() // setting flags
 
 	// instantiating global channels.
 	clientChan = make(chan message, clientchannelbuffer)
@@ -390,7 +487,7 @@ func main() {
 		wg.Done()       // decrementing the counter when done
 	}()
 	go func() {
-		connListener(*ip)
+		connListener(ip)
 		wg.Done() // decrementing the counter when done
 	}()
 	wg.Wait() // waiting for all goroutines to finish
@@ -442,29 +539,30 @@ func connListener(ip string) error {
 // Connection Handler takes connections from listener, and processes read/writes
 // TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
-	branding := []byte(branding.ColorString()) // branding as a byte array
-	conn.Write(branding)                       // writes branding to connection
+	// make a
+	branding := payload(branding.ColorString())
+	conn.Write(&msg{payload: branding}) // writes branding to connection
 	System.WriteToChannel(&msg{
-		payload: []byte(fmt.Sprintf("New connection from %v", conn.ConnectionId())),
+		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
 		msgType: System,
 	}) // logs start of new session
 
 	// defering closing function until we escape from session handler.
 	defer func() {
-		System.WriteToChannel(&msg{payload: []byte(fmt.Sprintf("Closing connection from %v", conn.ConnectionId()))})
+		System.WriteToChannel(&msg{payload: []byte(fmt.Sprintf("Closing connection from %v", conn.GetConnectionId()))})
 		// TODO(JeanHaley) Create a state handler(manager?) that can close this for us.
 		// we should send a signal through an explicit connection channel to
 		// the state handler that then tells it to close this connection and
 		// pops it from the list of active connections.
-		currentstate.RemoveConnection(conn.ConnectionId())
+		currentstate.RemoveConnection(conn.GetConnectionId())
 		conn.Close()
 	}()
 	for {
-		m, err := conn.Read() // read message from connection
+		m, err := conn.ReadMsg() // read message from connection
 		if err != nil {
 			if err == io.EOF {
 				System.WriteToChannel(&msg{
-					payload: []byte(fmt.Sprintf("Received EOF from %v .", conn.ConnectionId())),
+					payload: []byte(fmt.Sprintf("Received EOF from %v .", conn.GetConnectionId())),
 				})
 				return
 			} else {
@@ -472,43 +570,29 @@ func connHandler(conn ConnectionHandler) {
 				return
 			}
 		}
-		conn.AppendHistory(m) // saves client message to message history
 		// Logs message received
 		System.WriteToChannel(&msg{
-			payload: []byte(fmt.Sprintf("(%v)Received message: "+colorWrap(Purple, "%v"), conn.ConnectionId(), string(conn.LastMessage().GetPayload()))),
+			payload: []byte(fmt.Sprintf(
+				"(%v)Received message: "+
+					colorWrap(Purple, "%v"),
+				conn.GetConnectionId(),
+				string(conn.LastMessage().GetPayload()))),
 		})
-		var cmsg []byte
 		// Respond to message object
 		switch {
-		case string(conn.LastMessage().GetPayload()) == "corgi":
-			System.WriteToChannel(&msg{
-				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "corgi"), conn.ConnectionId)),
-			}) // Logs corgi message to server
-			cmsg = []byte(corgi) // Sends a corgi back to user.
-		case string(conn.LastMessage().GetPayload()) == "ping":
-			System.WriteToChannel(&msg{
-				payload: []byte(fmt.Sprintf("(%v)sending: "+colorWrap(Gray, "pong"), conn.ConnectionId)),
-			})
-			cmsg = []byte(colorWrap(Purple, "pong\n"))
-		// Catches "ascii:" and makes that ascii art.
-		case strings.Split(string(conn.LastMessage().GetPayload()), ":")[0] == "ascii":
-			System.WriteToChannel(&msg{
-				payload: []byte(fmt.Sprintf("(%v)Returning Ascii Art.", port)),
-			}) // Logs ascii art message to server
-			cmsg = []byte(
-				figure.NewColorFigure(
-					strings.Split(string(conn.LastMessage().GetPayload()), ":")[1],
-					"", "Blue", true).String() +
-					"\n") // Sends an Ascii art version of user's message back to user.
-		default:
-			cmsg = conn.LastMessage().GetPayload()
+		case m.GetPayload().String() == "corgi":
+			m.SetPayload(payload(corgi))
+		case m.GetPayload().String() == "ping":
+			m.SetPayload(payload("pong"))
+		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
+			m.SetPayload(
+				payload(
+					figure.NewColorFigure(
+						m.GetPayload().String(),
+						"nancyj-fancy",
+						"Green", true).ColorString())) // sets payload to ascii art
 		}
-		cmsg = append(cmsg, []byte("\n")...)
-		Client.WriteToChannel(&msg{
-			payload:     cmsg,
-			msgType:     Client,
-			destination: Global,
-		}) // Writes message to client channel
+		Client.WriteToChannel(m) // write message to Client Channel
 	}
 }
 
@@ -518,37 +602,29 @@ func connHandler(conn ConnectionHandler) {
 func MessageBroker() {
 	// Create a custom logger
 	logger := log.New(os.Stdout, "", log.LstdFlags)
-	mwrap := ""
 	// defering exit routine for eventHandler.
 	defer func() { logger.Printf(colorWrap(Red, "Exiting Error Logger")) }()
 	for {
 		select {
 		case msg := <-clientChan:
-			mwrap = colorWrap(Blue, msg.GetPayload().String()) // wraps message in color
-			if msg.GetDestination() == Global {                // if message is for all connections, write to all connections.
-				for _, conn := range currentstate.connections {
-					conn.Write([]byte(mwrap))
-				}
-			} else { // else write to specific connection.
-				for _, conn := range currentstate.connections {
-					if conn.ConnectionId() == msg.GetDestination() {
-						conn.Write([]byte(mwrap))
-					}
-				}
-			}
+			msg.ColorWrap()                // wraps payload in color based on message type
+			currentstate.WriteMessage(msg) // Write message to appropriate destination.
 		case msg := <-sysChan:
-			mwrap = colorWrap(Yellow, msg.GetPayload().String())
+			msg.ColorWrap() // wraps payload in color based on message type
 		case msg := <-logChan:
-			mwrap = colorWrap(Red, msg.GetPayload().String())
-		case <-time.After(loggerTime * time.Second):
+			msg.ColorWrap() // wraps payload in color based on message type
+		case <-time.After(time.Second * time.Duration(logerTime)):
 			// Log a message that no errors have occurred for loggerTime seconds
-			mwrap = colorWrap(Green, fmt.Sprintf(
-				"No errors for %v seconds, %v active connections",
-				loggerTime,
-				currentstate.ActiveConnections()))
+			msg := msg{
+				payload: []byte(fmt.Sprintf(
+					"No errors for %v seconds, %v active connections",
+					logerTime,
+					currentstate.ActiveConnections())),
+				msgType:     System,
+				destination: Global,
+			}
+			msg.ColorWrap() // wraps payload in color based on message type
 		}
-		// Logs messages, with appropriate colors based on channel.
-		logger.Println(mwrap)
 	}
 }
 
