@@ -593,11 +593,11 @@ func connHandler(conn ConnectionHandler) {
 		}
 		// Logs message received
 		System.WriteToChannel(msg{
-			payload: []byte(fmt.Sprintf(
+			payload: payload(fmt.Sprintf(
 				"(%v)Received message: "+
 					colorWrap(Purple, "%v"),
 				conn.GetConnectionId(),
-				string(conn.LastMessage().ColorWrap()))),
+				string(m.GetPayload().String()))),
 		})
 		// Respond to message object
 		switch {
