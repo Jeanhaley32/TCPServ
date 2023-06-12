@@ -262,7 +262,7 @@ func (c connection) ReadMsg() (msg, error) {
 	fmt.Printf("source: %v, destination: %v\n", route.source, route.destination)
 	n, err := c.conn.Read(buf)
 	if err != nil {
-		return m, err
+		return *m, err
 	}
 
 	m.InitMsg(buf[:n], Client, route)
@@ -608,7 +608,7 @@ func connHandler(conn ConnectionHandler) {
 						"nancyj-fancy",
 						"Green", true).ColorString())) // sets payload to ascii art
 		}
-		Client.WriteToChannel(m) // write message to Client Channel
+		Client.WriteToChannel(&m) // write message to Client Channel
 	}
 }
 
