@@ -444,22 +444,12 @@ func InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) (
 	}
 
 	m := msg{}
-	fmt.Println("created new msg object")
 	m.SetSource(route.source)
-	fmt.Println("set source")
 	m.SetDestination(destination)
-	fmt.Println("set destination")
-
 	m.generateUid()
-	fmt.Println("generated uid")
 	m.setTime()
-	fmt.Println("set time")
 	m.SetPayload(payload(b))
-	fmt.Println("set payload")
 	m.SetType(t)
-	fmt.Println("set type")
-	fmt.Println("returning msg")
-	fmt.Printf("contents of message:\n%+v\n", m)
 	return m, nil
 }
 
@@ -589,6 +579,7 @@ func connHandler(conn ConnectionHandler) {
 	}()
 	for {
 		m, err := conn.ReadMsg() // read message from connection
+		fmt.Println("Obtained Message.")
 		if err != nil {
 			if err == io.EOF {
 				System.WriteToChannel(msg{
