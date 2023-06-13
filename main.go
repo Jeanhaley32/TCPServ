@@ -634,7 +634,7 @@ func connHandler(conn ConnectionHandler) {
 			payload(
 				fmt.Sprintf("(%v) %v",
 					conn.GetConnectionId(),
-					string(m.GetPayload().String()))))
+					string(m.ColorWrap()))))
 		Client.WriteToChannel(m) // write message to Client Channel
 	}
 }
@@ -683,7 +683,7 @@ func MessageBroker() {
 			ScreenPrintBytes = append(ScreenPrintBytes, splashScreen()...)
 			// reflect screen onto all clients.
 			for _, v := range globalState {
-				ScreenPrintBytes = append(ScreenPrintBytes, v.ColorWrap()...)
+				ScreenPrintBytes = append(ScreenPrintBytes, v.GetPayload()...)
 			}
 			screen.SetPayload(payload(ScreenPrintBytes))
 			currentstate.WriteMessage(screen)
