@@ -15,7 +15,6 @@ func main() {
 	stringTest := []byte("hello world")
 	asciiTest := []byte("ascii:test")
 	corgiTest := []byte("corgi")
-
 	_, err = conn.Write(stringTest)
 	if err != nil {
 		panic(err)

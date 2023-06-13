@@ -596,19 +596,22 @@ func connHandler(conn ConnectionHandler) {
 		// Respond to message object
 		switch {
 		case m.GetPayload().String() == "corgi":
-			m.SetPayload(payload(corgi))
-			Client.WriteToChannel(m)
+			newPayload := payload(fmt.Sprint("%v: %v", conn.GetConnectionId(), corgi))
+			m.SetPayload(newPayload)
+			currentstate.WriteMessage(m)
 		case m.GetPayload().String() == "ping":
-			m.SetPayload(payload("pong"))
-			Client.WriteToChannel(m)
+			newPayload := payload(fmt.Sprint("%v: %v", conn.GetConnectionId(), "pong"))
+			m.SetPayload(newPayload)
+			currentstate.WriteMessage(m)
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
-			m.SetPayload(
-				payload(
-					figure.NewColorFigure(
-						// remove trailing newline
-						strings.Split(m.GetPayload().String(), ":")[1][:len(strings.Split(m.GetPayload().String(), ":")[1])-1],
-						"nancyj-fancy",
-						"Green", true).ColorString())) // sets payload to ascii art
+			newPayload := payload(
+				figure.NewColorFigure(
+					// remove trailing newline
+					strings.Split(m.GetPayload().String(), ":")[1][:len(strings.Split(m.GetPayload().String(), ":")[1])-1],
+					"nancyj-fancy",
+					"Green", true).ColorString()) // sets payload to ascii art
+			m.SetPayload(newPayload)
+			currentstate.WriteMessage(m)
 		}
 		Client.WriteToChannel(m) // write message to Client Channel
 	}
@@ -626,7 +629,6 @@ func MessageBroker() {
 		select {
 		case msg := <-clientChan:
 			currentstate.WriteMessage(msg)
-			logger.Printf("(%v)Received payload: %v", msg.GetSource(), msg.ColorWrap())
 		case msg := <-sysChan:
 			logger.Println(msg.ColorWrap())
 		case msg := <-logChan:
