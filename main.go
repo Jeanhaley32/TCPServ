@@ -609,10 +609,12 @@ func connHandler(conn ConnectionHandler) {
 		// Catch trigger words, and handle each one differently.
 		switch {
 		case m.GetPayload().String() == "corgi":
-			m.SetPayload(payload(fmt.Sprintf("%v\n", corgi)))
+			fmt.Print(corgi)
+			m.SetPayload(payload(fmt.Sprintf("%v", corgi)))
 			Client.WriteToChannel(m)
 			continue
 		case m.GetPayload().String() == "ping":
+			fmt.Println("pong")
 			m.SetPayload(payload("pong"))
 			Client.WriteToChannel(m)
 			continue
