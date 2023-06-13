@@ -598,11 +598,9 @@ func connHandler(conn ConnectionHandler) {
 		case m.GetPayload().String() == "corgi":
 			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), corgi))
 			m.SetPayload(newPayload)
-			currentstate.WriteMessage(m)
 		case m.GetPayload().String() == "ping":
 			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), "pong"))
 			m.SetPayload(newPayload)
-			currentstate.WriteMessage(m)
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
 			newPayload := payload(
 				figure.NewColorFigure(
@@ -611,9 +609,9 @@ func connHandler(conn ConnectionHandler) {
 					"nancyj-fancy",
 					"Green", true).ColorString()) // sets payload to ascii art
 			m.SetPayload(newPayload)
-			currentstate.WriteMessage(m)
 		}
 		Client.WriteToChannel(m) // write message to Client Channel
+		System.WriteToChannel(m) // write message to Client Channel
 	}
 }
 
@@ -637,12 +635,12 @@ func MessageBroker() {
 			// Log a message that no errors have occurred for loggerTime seconds
 			msg := msg{
 				payload: []byte(fmt.Sprintf(
-					"No errors for %v seconds, %v active connections",
-					logerTime,
+					"TheVoid - Current active connections: %v",
 					currentstate.ActiveConnections())),
 				msgType:     System,
 				destination: Global,
 			}
+			Client.WriteToChannel(msg)
 			logger.Println(msg.ColorWrap())
 		}
 	}
