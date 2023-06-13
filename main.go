@@ -38,6 +38,7 @@ const (
 		"⠀⣿⣿⣿⣿⣿⣿⡟⠸⠿⠿⠿⣿⣿⣿⣿⣿⣿⣿⠿⠋⠀⠀⠀\n" +
 		"⠀⠘⢿⣿⣿⠿⠋⠀⠀⠀⠀⠀⠀⠉⠉⣿⣿⡏⠁⠀⠀⠀⠀⠀\n" +
 		"⠀⠀⢸⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⡇⠀⠀⠀⠀⠀⠀\n"
+	clearScreen = "\033[H\033[2J"
 )
 
 // ___ Global Variables ___
@@ -556,7 +557,15 @@ func connListener(ip string) error {
 // Connection Handler takes connections from listener, and processes read/writes
 // TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
-	conn.Write(msg{payload: payload(branding.ColorString())}) // writes branding to connection
+	conn.Write(
+		msg{
+			payload: payload(clearScreen),
+		}) // clears screen
+	conn.Write(
+		msg{
+			payload: payload(branding.ColorString()),
+		}) // writes branding to connection
+
 	System.WriteToChannel(msg{
 		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
 		msgType: System,
@@ -585,7 +594,7 @@ func connHandler(conn ConnectionHandler) {
 				return
 			}
 		}
-		// Logs message received
+		// Log message received
 		System.WriteToChannel(msg{
 			payload: payload(fmt.Sprintf(
 				"(%v)Received message: "+
@@ -596,14 +605,14 @@ func connHandler(conn ConnectionHandler) {
 		// Respond to message object
 		switch {
 		case m.GetPayload().String() == "corgi":
-			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), corgi))
+			newPayload := payload(corgi)
 			m.SetPayload(newPayload)
-			Client.WriteToChannel(m) // write message to Client Channel
+			Client.WriteToChannel(m)
 			continue
 		case m.GetPayload().String() == "ping":
-			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), "pong"))
+			newPayload := payload("pong")
 			m.SetPayload(newPayload)
-			Client.WriteToChannel(m) // write message to Client Channel
+			Client.WriteToChannel(m)
 			continue
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
 			newPayload := payload(
@@ -613,8 +622,14 @@ func connHandler(conn ConnectionHandler) {
 					"nancyj-fancy",
 					"Green", true).ColorString()) // sets payload to ascii art
 			m.SetPayload(newPayload)
+			Client.WriteToChannel(m)
 			continue
 		}
+		m.SetPayload(
+			payload(
+				fmt.Sprintf("(%v) %v",
+					conn.GetConnectionId(),
+					string(m.GetPayload().String()))))
 		Client.WriteToChannel(m) // write message to Client Channel
 	}
 }
@@ -629,23 +644,23 @@ func MessageBroker() {
 	defer func() { logger.Printf(colorWrap(Red, "Exiting Error Logger")) }()
 	for {
 		select {
-		case msg := <-clientChan:
-			fmt.Println("received client message")
-			currentstate.WriteMessage(msg)
-		case msg := <-sysChan:
-			logger.Println(msg.ColorWrap())
-		case msg := <-logChan:
-			logger.Println(msg.ColorWrap())
+		case m := <-clientChan:
+			currentstate.WriteMessage(m)
+		case m := <-sysChan:
+			logger.Println(m.ColorWrap())
+		case m := <-logChan:
+			logger.Println(m.ColorWrap())
 		case <-time.After(time.Second * time.Duration(logerTime)):
-			msg := msg{
+			m := msg{
 				payload: []byte(fmt.Sprintf(
 					"TheVoid - Current active connections: %v",
 					currentstate.ActiveConnections())),
 				msgType:     System,
 				destination: Global,
 			}
-			Client.WriteToChannel(msg)
-			logger.Println(msg.ColorWrap())
+			Client.WriteToChannel(msg{payload: payload(clearScreen)})
+			Client.WriteToChannel(m)
+			logger.Println(m.ColorWrap())
 		}
 	}
 }
