@@ -687,9 +687,9 @@ func MessageBroker() {
 			screen.SetPayload(payload(ScreenPrintBytes))
 			currentstate.WriteMessage(screen)
 		case m := <-sysChan:
-			logger.Println(m.ColorWrap())
+			logger.Print(m.ColorWrap())
 		case m := <-logChan:
-			logger.Println(m.ColorWrap())
+			logger.Print(m.ColorWrap())
 		}
 	}
 }
