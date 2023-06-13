@@ -609,8 +609,8 @@ func connHandler(conn ConnectionHandler) {
 						strings.Split(m.GetPayload().String(), ":")[1][:len(strings.Split(m.GetPayload().String(), ":")[1])-1],
 						"nancyj-fancy",
 						"Green", true).ColorString())) // sets payload to ascii art
-			Client.WriteToChannel(m) // write message to Client Channel
 		}
+		Client.WriteToChannel(m) // write message to Client Channel
 	}
 }
 
