@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -164,6 +165,15 @@ const (
 	Cyan
 	Gray
 	White
+	Black
+	LightGray
+	DarkGray
+	LightRed
+	LightGreen
+	LightYellow
+	LightBlue
+	LightMagenta
+	LightCyan
 )
 
 // Returns color as a string
@@ -185,6 +195,24 @@ func (c Color) Color() string {
 		return "\033[37m"
 	case White:
 		return "\033[97m"
+	case Black:
+		return "\033[30m"
+	case LightGray:
+		return "\033[37m"
+	case DarkGray:
+		return "\033[90m"
+	case LightRed:
+		return "\033[91m"
+	case LightGreen:
+		return "\033[92m"
+	case LightYellow:
+		return "\033[93m"
+	case LightBlue:
+		return "\033[94m"
+	case LightMagenta:
+		return "\033[95m"
+	case LightCyan:
+		return "\033[96m"
 	}
 	return ""
 }
@@ -223,6 +251,7 @@ type cnchanbundle struct {
 
 // Connection object, represent a connection to the server.
 type connection struct {
+	connColor      Color        // color used to represent connection
 	messageHistory []msg        // Message History
 	connectionId   NID          // Unique Identifier for connection
 	conn           net.Conn     // connection objct
@@ -232,6 +261,8 @@ type connection struct {
 
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
+	ChooseConnColor()             // Chooses a color for connection
+	GetConnColor() Color          // returns connection color
 	ReadMsg() (msg, error)        // reads from connection, and returns a constructed message
 	Write(msg) (n int, err error) // Writes to Connection handler Channel
 	Close() error                 // Exposes net.Conn Close method
@@ -246,8 +277,21 @@ func initConnection(c *connection, conn net.Conn) {
 	c.chbundle.conn = make(chan msg, 20)
 	c.chbundle.ingest = make(chan msg, 20)
 	c.chbundle.term = make(chan interface{})
+	c.ChooseConnColor()
 	c.conn = conn
 	c.generateUid()
+}
+
+// randomly chooses a color to represent this connection
+func (c *connection) ChooseConnColor() {
+	rand.Seed(time.Now().UnixNano())
+	// this is used to color code messages from this connection.
+	c.connColor = Color(rand.Intn(17))
+}
+
+// returns connections color
+func (c connection) GetConnColor() Color {
+	return c.connColor
 }
 
 // Returns last message bundled in messageHistory
@@ -271,7 +315,7 @@ func (c connection) ReadMsg() (msg, error) {
 	if err != nil {
 		return msg{payload: buf}, err
 	}
-	m, err := InitMsg(buf[:n], Client, route)
+	m, err := InitMsg(buf[:n], Client, route, c.GetConnColor())
 	if err != nil {
 		return m, err
 	}
@@ -370,6 +414,7 @@ func (p payload) String() string {
 // Message "object"
 // individual message received from connection.
 type msg struct {
+	MsgColor     Color       // color used to represent message
 	destination  NID         // destination of message
 	source       NID         // source of message
 	ID           MsgID       // Unique Identifier for message
@@ -407,20 +452,35 @@ func (m *msg) SetDestination(n NID) {
 func (m msg) ColorWrap() string {
 	var newPayload []byte
 	const reset = "\033[0m"
-	switch m.msgType {
-	case Client:
-		newPayload = payload(Green.Color() + string(m.payload) + reset)
-	case Error:
-		newPayload = payload(Red.Color() + string(m.payload) + reset)
-	case System:
-		newPayload = payload(Yellow.Color() + string(m.payload) + reset)
-	}
+	newPayload = payload(m.GetMsgColor().Color() + string(m.payload) + reset)
 	return string(newPayload)
 }
 
 // sets message type
 func (m *msg) SetType(t MsgEnumType) {
 	m.msgType = t
+}
+
+// sets color used to represent message.
+func (m *msg) SetMsgColor(c *Color) {
+	if c != nil {
+		m.MsgColor = *c
+		return
+	}
+	if m.msgType == Client {
+		m.MsgColor = Green
+	}
+	if m.msgType == Error {
+		m.MsgColor = Red
+	}
+	if m.msgType == System {
+		m.MsgColor = Yellow
+	}
+}
+
+// gets msg color
+func (m msg) GetMsgColor() Color {
+	return m.MsgColor
 }
 
 // sets message source
@@ -434,15 +494,15 @@ func (m *msg) SetSource(n NID) {
 //	sets time to current time
 //	sets payload to byte array
 //	sets message type.
-func InitMsg(b []byte, t MsgEnumType, r route) (msg, error) {
+func InitMsg(b []byte, t MsgEnumType, r route, c Color) (msg, error) {
 	// if destination is not 0, set destination to destination
 	// else destination is considered global.
 	destination := Global
 	if r.destination != 0 {
 		destination = r.destination
 	}
-
 	m := msg{}
+	m.SetMsgColor(&c)
 	m.SetSource(r.source)
 	m.SetDestination(destination)
 	m.generateUid()
@@ -654,7 +714,7 @@ func MessageBroker() {
 			screen, err := InitMsg(ScreenPrintBytes, Client, route{
 				destination: Global,
 				source:      Global,
-			})
+			}, Blue)
 
 			// TODO(jeanhaley) Parse the comment below when you're not tired.
 			// if we fail to initialize message object, log error to error channel and continue.
