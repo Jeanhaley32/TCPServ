@@ -679,7 +679,8 @@ func MessageBroker() {
 				globalState = append(globalState, m)
 			}
 			// build screen
-			ScreenPrintBytes = []byte(clearScreen + colorWrap(Red, branding.String()) + "\n")
+			ScreenPrintBytes = []byte(clearScreen + colorWrap(Red, branding.ColorString()) + "\n")
+			ScreenPrintBytes = append(ScreenPrintBytes, splashScreen()...)
 			// reflect screen onto all clients.
 			for _, v := range globalState {
 				ScreenPrintBytes = append(ScreenPrintBytes, v.GetPayload().String()...)
