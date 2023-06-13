@@ -312,7 +312,7 @@ type StateHandler interface {
 	WriteMessage(message) error // Writes message to connections based on message destination
 }
 
-func (s state) WriteMessage(m msg) error {
+func (s *state) WriteMessage(m msg) error {
 	// if message destination is global, we write to all connections
 	if m.GetDestination() == Global {
 		for _, c := range s.connections {
@@ -602,10 +602,10 @@ func connHandler(conn ConnectionHandler) {
 			m.SetPayload(payload("pong"))
 			Client.WriteToChannel(m)
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
-			fmt.Println("caught ascii")
 			m.SetPayload(
 				payload(
 					figure.NewColorFigure(
+						// remove trailing newline
 						strings.Split(m.GetPayload().String(), ":")[1][:len(strings.Split(m.GetPayload().String(), ":")[1])-1],
 						"nancyj-fancy",
 						"Green", true).ColorString())) // sets payload to ascii art
