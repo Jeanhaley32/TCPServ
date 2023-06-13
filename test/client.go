@@ -1,3 +1,7 @@
+// For this to work, we need to spin off the read element of this program into a goroutine.
+// otherwise, the program will only read X amount of lines. There may be a loop way of doing this
+// checking for EOF. But I'm not sure how to do that yet. I have an idea, but i'm lazy.
+// i'll do it later.
 package main
 
 import (
