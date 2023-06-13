@@ -616,7 +616,6 @@ func connHandler(conn ConnectionHandler) {
 			continue
 		}
 		Client.WriteToChannel(m) // write message to Client Channel
-		System.WriteToChannel(m) // write message to Client Channel
 	}
 }
 
