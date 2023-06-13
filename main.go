@@ -563,7 +563,7 @@ func connHandler(conn ConnectionHandler) {
 		}) // clears screen
 	conn.Write(
 		msg{
-			payload: payload(branding.ColorString()),
+			payload: payload(branding.ColorString() + "\n" + splashScreen()),
 		}) // writes branding to connection
 
 	System.WriteToChannel(msg{
@@ -663,6 +663,13 @@ func MessageBroker() {
 			logger.Println(m.ColorWrap())
 		}
 	}
+}
+
+// Returns Splash Screen elements.
+func splashScreen() string {
+	return fmt.Sprintf(
+		"%v\n Welcome to TheVoid!/n There are currently %v active connections./n",
+		banner, currentstate.ActiveConnections())
 }
 
 // colorWrap wraps a string in a color
