@@ -1,16 +1,10 @@
 package main
 
 // TODO(jeanhaley) - The following items need to be addressed:
-//		- Rethink the "state handler" and how it is going to be used. maybe make it a "connection manager".
-//		- Create a flow chart that shows the flow of how a client []byte is wrapped in a "msg", and routed through
-//	          the system. I feel that at the moment there is no real rhyme or reason for this, and this needs to be
-//		  codified.
-// 		- enable the acceptance of CLI arguments to set the IP, Port, and Buffer size.
-//		- re-factor code. Breakdown individual, independent functions into their own files.
-//              - More Long term
-//			- Break off individual components into seperate "micro-services" using GRPC for communication.
-// 			- use Bubbtletea to create a CLI interface for the server.
-
+// 1. Create a logging system, that will handle all logging for this server.
+// 2. Create a routine that handles global messages, and sends a screen state to all clients.
+// 3. Create a system to handle the state of the server, and the state of the clients.
+// 4. Create a better method of wrapping errors in error messages, to make routing them easier.
 import (
 	"flag"
 	"fmt"
@@ -46,8 +40,10 @@ const (
 var (
 	ip, netp, port, banner                                                            string
 	buffersize, logerTime, clientchannelbuffer, logchannelbuffer, systemchannelbuffer int
-	clientChan, logChan, sysChan                                                      ch // Global Channels
+	ClientMessageCount                                                                int // Sets limit for messages show to client
+	clientChan, logChan, sysChan                                                      ch  // Global Channels
 	currentstate                                                                      state
+	globalState                                                                       []msg
 )
 
 var (
@@ -68,7 +64,10 @@ func init() {
 	flag.IntVar(&clientchannelbuffer, "clientchannelbuffer", 20, "size of client channel buffer")
 	flag.IntVar(&logchannelbuffer, "logchannelbuffer", 20, "size of log channel buffer")
 	flag.IntVar(&systemchannelbuffer, "systemchannelbuffer", 20, "size of system channel buffer")
+	flag.IntVar(&ClientMessageCount, "ClientMessageCount", 20, "Number of messages to show to client")
 	flag.Parse()
+
+	globalState = make([]msg, 0, ClientMessageCount)
 	// instantiating global channels.
 	clientChan = make(chan msg, clientchannelbuffer)
 	logChan = make(chan msg, logchannelbuffer)
@@ -80,6 +79,12 @@ func init() {
 // ___ Global Channel Variables ___
 // create a channel type with blank interface
 type ch chan msg
+
+// define route type.
+type route struct {
+	source      NID
+	destination NID
+}
 
 // create a Termination channel type with blank interface
 type termch chan interface{}
@@ -427,19 +432,19 @@ func (m *msg) SetSource(n NID) {
 //	sets time to current time
 //	sets payload to byte array
 //	sets message type.
-func InitMsg(b []byte, t MsgEnumType, route struct{ source, destination NID }) (msg, error) {
+func InitMsg(b []byte, t MsgEnumType, r route) (msg, error) {
 	// if destination is not 0, set destination to destination
 	// If source is not provided, return an error.
-	if route.source == 0 {
+	if r.source == 0 {
 		return msg{}, fmt.Errorf("source not provided")
 	}
 	destination := Global
-	if route.destination != 0 {
-		destination = route.destination
+	if r.destination != 0 {
+		destination = r.destination
 	}
 
 	m := msg{}
-	m.SetSource(route.source)
+	m.SetSource(r.source)
 	m.SetDestination(destination)
 	m.generateUid()
 	m.setTime()
@@ -645,21 +650,46 @@ func MessageBroker() {
 	for {
 		select {
 		case m := <-clientChan:
-			currentstate.WriteMessage(m)
+			var ScreenPrintBytes []byte
+			// initialize message object for screen
+			screen, err := InitMsg(ScreenPrintBytes, Client, route{
+				destination: Global,
+				source:      Global,
+			})
+
+			// TODO(jeanhaley) Parse the comment below when you're not tired.
+			// if we fail to initialize message object, log error to error channel and continue.
+			// lol, since we are logging a message to the same routine that clears the channel, this
+			// will innevitable cause a deadlock. Well, if we over-write to it, there is a message queue set to 20 atm
+			// there may be an interesting solution to this.
+			// If instead of the Message broker being a singleton, we create a new one for each connection.
+			// This would allow us to have a dedicated error channel for each connection...
+			// I'm not sure if this is a good idea or not... we can just not send the error through the channel,
+			// and log it directly when it appears. This would be a lot simpler. To be clear, i'm going to keep
+			// this failure state intact, because, I kinda want to see it fail.
+			if err != nil {
+				Error.WriteToChannel(msg{
+					payload: []byte(err.Error())})
+			}
+			// if globalState is full, pop first element and append new message.
+			if len(globalState)+1 == ClientMessageCount {
+				globalState = globalState[1:]
+				globalState = append(globalState, m)
+			} else {
+				globalState = append(globalState, m)
+			}
+			// build screen
+			ScreenPrintBytes = []byte(clearScreen + colorWrap(Red, banner) + "\n")
+			// reflect screen onto all clients.
+			for _, v := range globalState {
+				ScreenPrintBytes = append(ScreenPrintBytes, v.GetPayload().String()...)
+				ScreenPrintBytes = append(ScreenPrintBytes, '\n')
+			}
+			screen.SetPayload(payload(ScreenPrintBytes))
+			currentstate.WriteMessage(screen)
 		case m := <-sysChan:
 			logger.Println(m.ColorWrap())
 		case m := <-logChan:
-			logger.Println(m.ColorWrap())
-		case <-time.After(time.Second * time.Duration(logerTime)):
-			m := msg{
-				payload: []byte(fmt.Sprintf(
-					"TheVoid - Current active connections: %v",
-					currentstate.ActiveConnections())),
-				msgType:     System,
-				destination: Global,
-			}
-			Client.WriteToChannel(msg{payload: payload(clearScreen)})
-			Client.WriteToChannel(m)
 			logger.Println(m.ColorWrap())
 		}
 	}
