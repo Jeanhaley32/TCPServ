@@ -2,6 +2,8 @@ package main
 
 // TODO(jeanhaley) - The following items need to be addressed:
 // 1. Create a logging system, that will handle all logging for this server.
+// 2. maybe breakup message broker into a log handler? also, why are we distinguishing between log and system?
+//    Maybe they should be treated the same?
 // 2. Create a routine that handles global messages, and sends a screen state to all clients.
 // 3. Create a system to handle the state of the server, and the state of the clients.
 // 4. Create a better method of wrapping errors in error messages, to make routing them easier.
@@ -434,10 +436,7 @@ func (m *msg) SetSource(n NID) {
 //	sets message type.
 func InitMsg(b []byte, t MsgEnumType, r route) (msg, error) {
 	// if destination is not 0, set destination to destination
-	// If source is not provided, return an error.
-	if r.source == 0 {
-		return msg{}, fmt.Errorf("source not provided")
-	}
+	// else destination is considered global.
 	destination := Global
 	if r.destination != 0 {
 		destination = r.destination
@@ -607,16 +606,14 @@ func connHandler(conn ConnectionHandler) {
 				conn.GetConnectionId(),
 				string(m.GetPayload().String()))),
 		})
-		// Respond to message object
+		// Catch trigger words, and handle each one differently.
 		switch {
 		case m.GetPayload().String() == "corgi":
-			newPayload := payload(corgi)
-			m.SetPayload(newPayload)
+			m.SetPayload(payload(fmt.Printf("%v\n", corgi))))
 			Client.WriteToChannel(m)
 			continue
 		case m.GetPayload().String() == "ping":
-			newPayload := payload("pong")
-			m.SetPayload(newPayload)
+			m.SetPayload(payload("pong"))
 			Client.WriteToChannel(m)
 			continue
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
@@ -672,7 +669,7 @@ func MessageBroker() {
 					payload: []byte(err.Error())})
 			}
 			// if globalState is full, pop first element and append new message.
-			if len(globalState)+1 == ClientMessageCount {
+			if len(globalState) == ClientMessageCount {
 				globalState = globalState[1:]
 				globalState = append(globalState, m)
 			} else {
