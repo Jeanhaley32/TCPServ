@@ -596,11 +596,11 @@ func connHandler(conn ConnectionHandler) {
 		// Respond to message object
 		switch {
 		case m.GetPayload().String() == "corgi":
-			newPayload := payload(fmt.Sprint("%v: %v", conn.GetConnectionId(), corgi))
+			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), corgi))
 			m.SetPayload(newPayload)
 			currentstate.WriteMessage(m)
 		case m.GetPayload().String() == "ping":
-			newPayload := payload(fmt.Sprint("%v: %v", conn.GetConnectionId(), "pong"))
+			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), "pong"))
 			m.SetPayload(newPayload)
 			currentstate.WriteMessage(m)
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
