@@ -598,9 +598,13 @@ func connHandler(conn ConnectionHandler) {
 		case m.GetPayload().String() == "corgi":
 			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), corgi))
 			m.SetPayload(newPayload)
+			Client.WriteToChannel(m) // write message to Client Channel
+			continue
 		case m.GetPayload().String() == "ping":
 			newPayload := payload(fmt.Sprintf("%v: %v", conn.GetConnectionId(), "pong"))
 			m.SetPayload(newPayload)
+			Client.WriteToChannel(m) // write message to Client Channel
+			continue
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
 			newPayload := payload(
 				figure.NewColorFigure(
@@ -609,6 +613,7 @@ func connHandler(conn ConnectionHandler) {
 					"nancyj-fancy",
 					"Green", true).ColorString()) // sets payload to ascii art
 			m.SetPayload(newPayload)
+			continue
 		}
 		Client.WriteToChannel(m) // write message to Client Channel
 		System.WriteToChannel(m) // write message to Client Channel
