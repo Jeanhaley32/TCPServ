@@ -667,9 +667,9 @@ func MessageBroker() {
 
 // Returns Splash Screen elements.
 func splashScreen() string {
-	return fmt.Sprintf(
-		"%v\n Welcome to TheVoid!/n There are currently %v active connections./n",
-		banner, currentstate.ActiveConnections())
+	splashmessage := fmt.Sprintf("\tWelcome to The Void!\n"+
+		"There are Currently %v active connections.\n", currentstate.ActiveConnections())
+	return colorWrap(Red, splashmessage)
 }
 
 // colorWrap wraps a string in a color
