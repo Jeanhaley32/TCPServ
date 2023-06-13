@@ -273,7 +273,7 @@ func (c connection) ReadMsg() (msg, error) {
 
 // Writes to Connection handler Channel
 func (c *connection) Write(m msg) (int, error) {
-	return c.conn.Write(m.GetPayload())
+	return c.conn.Write([]byte(m.ColorWrap()))
 }
 
 // Exposes net.Conn Close method
@@ -630,13 +630,13 @@ func MessageBroker() {
 	for {
 		select {
 		case msg := <-clientChan:
+			fmt.Println("received client message")
 			currentstate.WriteMessage(msg)
 		case msg := <-sysChan:
 			logger.Println(msg.ColorWrap())
 		case msg := <-logChan:
 			logger.Println(msg.ColorWrap())
 		case <-time.After(time.Second * time.Duration(logerTime)):
-			// Log a message that no errors have occurred for loggerTime seconds
 			msg := msg{
 				payload: []byte(fmt.Sprintf(
 					"TheVoid - Current active connections: %v",
