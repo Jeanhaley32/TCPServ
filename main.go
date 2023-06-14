@@ -261,6 +261,7 @@ type connection struct {
 
 // Defines interface needed for connection handler
 type ConnectionHandler interface {
+	GetSplashScreen() string      // returns connections unique splash screen
 	ChooseConnColor()             // Chooses a color for connection
 	GetConnColor() Color          // returns connection color
 	ReadMsg() (msg, error)        // reads from connection, and returns a constructed message
@@ -280,6 +281,17 @@ func initConnection(c *connection, conn net.Conn) {
 	c.ChooseConnColor()
 	c.conn = conn
 	c.generateUid()
+}
+
+// returns a unique splash screen for the connection.
+func (c connection) GetSplashScreen() string {
+	r := time.Since(c.startTime)
+	h := int(r.Hours())
+	m := int(r.Minutes()) % 60
+	s := int(r.Seconds()) % 60
+	connectionTime := fmt.Sprintf("Session Length: %02d:%02d:%02d", h, m, s)
+	connectionId := fmt.Sprintf("ConnID:%v", c.GetConnectionId())
+	return colorWrap(Purple, fmt.Sprintf("%v\t\t\t\t%v\n", connectionId, connectionTime))
 }
 
 // randomly chooses a color to represent this connection
@@ -361,9 +373,25 @@ type StateHandler interface {
 	ActiveConnections() int     // Returns number of active connections
 	RemoveConnection(NID)       // Removes connection from state 'connections
 	AddConnection(*connection)  // Appends a new connection to state 'connections
+	WriteScreen(message) error  // Updates all connections with new screen
 	WriteMessage(message) error // Writes message to connections based on message destination
 }
 
+// Updates all connections with new screen
+func (s *state) WriteScreen() {
+	coloredBranding := colorWrap(Red, branding.ColorString())
+	splash := splashScreen()
+	for _, c := range s.connections {
+		ClientMessage := c.GetSplashScreen()
+		newScreen := []byte(fmt.Sprintf("%v%v\n%v\n%v\n", clearScreen, coloredBranding, splash, ClientMessage))
+		for _, m := range globalState {
+			newScreen = append(newScreen, m.GetPayload()...)
+		}
+		c.Write(msg{payload: payload(newScreen), destination: Global})
+	}
+}
+
+// Writes message to connections based on message destination
 func (s *state) WriteMessage(m msg) error {
 	// if message destination is global, we write to all connections
 	if m.GetDestination() == Global {
@@ -621,19 +649,27 @@ func connListener(ip string) error {
 // Connection Handler takes connections from listener, and processes read/writes
 // TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
-	conn.Write(
-		msg{
-			payload: payload(clearScreen),
-		}) // clears screen
-	conn.Write(
-		msg{
-			payload: payload(branding.ColorString() + "\n" + splashScreen()),
-		}) // writes branding to connection
-
+	// Log new Connection.
 	System.WriteToChannel(msg{
 		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
 		msgType: System,
-	}) // logs start of new session
+	})
+	// Send message to clearn new connection screen.
+	conn.Write(
+		msg{
+			payload: payload(clearScreen),
+		})
+	// Display Servier Branding message.
+	conn.Write(
+		msg{
+			payload: payload(branding.ColorString() +
+				"\n" + splashScreen()),
+		}) // writes branding to connection
+	// log start of new connection.
+	System.WriteToChannel(msg{
+		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
+		msgType: System,
+	})
 
 	// defering closing function until we escape from session handler.
 	defer func() {
@@ -669,14 +705,12 @@ func connHandler(conn ConnectionHandler) {
 		// Catch trigger words, and handle each one differently.
 		switch {
 		case m.GetPayload().String() == "corgi":
-			fmt.Print(corgi)
 			m.SetPayload(payload(fmt.Sprintf("%v", corgi)))
-			Client.WriteToChannel(m)
+			//Client.WriteToChannel(m)
 			continue
 		case m.GetPayload().String() == "ping":
-			fmt.Println("pong")
 			m.SetPayload(payload("pong"))
-			Client.WriteToChannel(m)
+			//Client.WriteToChannel(m)
 			continue
 		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
 			newPayload := payload(
@@ -709,27 +743,6 @@ func MessageBroker() {
 	for {
 		select {
 		case m := <-clientChan:
-			var ScreenPrintBytes []byte
-			// initialize message object for screen
-			screen, err := InitMsg(ScreenPrintBytes, Client, route{
-				destination: Global,
-				source:      Global,
-			}, Blue)
-
-			// TODO(jeanhaley) Parse the comment below when you're not tired.
-			// if we fail to initialize message object, log error to error channel and continue.
-			// lol, since we are logging a message to the same routine that clears the channel, this
-			// will innevitable cause a deadlock. Well, if we over-write to it, there is a message queue set to 20 atm
-			// there may be an interesting solution to this.
-			// If instead of the Message broker being a singleton, we create a new one for each connection.
-			// This would allow us to have a dedicated error channel for each connection...
-			// I'm not sure if this is a good idea or not... we can just not send the error through the channel,
-			// and log it directly when it appears. This would be a lot simpler. To be clear, i'm going to keep
-			// this failure state intact, because, I kinda want to see it fail.
-			if err != nil {
-				Error.WriteToChannel(msg{
-					payload: []byte(err.Error())})
-			}
 			// if globalState is full, pop first element and append new message.
 			if len(globalState) == ClientMessageCount {
 				globalState = globalState[1:]
@@ -737,15 +750,7 @@ func MessageBroker() {
 			} else {
 				globalState = append(globalState, m)
 			}
-			// build screen
-			ScreenPrintBytes = []byte(clearScreen + colorWrap(Red, branding.ColorString()) + "\n")
-			ScreenPrintBytes = append(ScreenPrintBytes, splashScreen()...)
-			// reflect screen onto all clients.
-			for _, v := range globalState {
-				ScreenPrintBytes = append(ScreenPrintBytes, v.GetPayload()...)
-			}
-			screen.SetPayload(payload(ScreenPrintBytes))
-			currentstate.WriteMessage(screen)
+			currentstate.WriteScreen()
 		case m := <-sysChan:
 			logger.Print(m.ColorWrap())
 		case m := <-logChan:
@@ -754,11 +759,17 @@ func MessageBroker() {
 	}
 }
 
+//
+
 // Returns Splash Screen elements.
 func splashScreen() string {
-	splashmessage := fmt.Sprintf("\tWelcome to The Void!\n"+
-		"There are Currently %v active connections.\n", currentstate.ActiveConnections())
-	return colorWrap(Red, splashmessage)
+	welcome := "Welcome to the Void!"
+	activeconn := colorWrap(
+		Green, fmt.Sprintf(
+			"There are currently %v active connections.", currentstate.ActiveConnections()))
+	directions := colorWrap(Purple, "Type 'ascii:' before your message to display ascii art")
+	splashmessage := fmt.Sprintf("\t\t%v\n\t  %v\n  %v\v\n", welcome, activeconn, directions)
+	return splashmessage
 }
 
 // colorWrap wraps a string in a color
