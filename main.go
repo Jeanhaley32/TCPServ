@@ -332,7 +332,9 @@ func (c connection) ReadMsg() (msg, error) {
 	if err != nil {
 		return msg{payload: buf}, err
 	}
-	m, err := InitMsg(buf[:n], Client, route, c.GetConnColor())
+	cutnewline := len([]byte("\n"))
+	// Removes trailing newline from message.
+	m, err := InitMsg(buf[:n-cutnewline], Client, route, c.GetConnColor())
 	if err != nil {
 		return m, err
 	}
@@ -563,7 +565,7 @@ func (m msg) GetPayload() payload {
 	return m.payload
 }
 
-// sets message payload
+// Sets payload
 func (m *msg) SetPayload(p payload) {
 	m.payload = p
 }
@@ -614,7 +616,7 @@ func connListener(ip string) error {
 	listener, err := net.Listen(netp, net.JoinHostPort(ip, port))
 	if err != nil {
 		// if we fail to create listener, we log the error and exit. This is a fatal error.
-		log.Fatalf("Failed to create listener: %q", err)
+		log.Fatalf("ConnListener: Failed to create listener: %q", err)
 	}
 	// defer closing of listener until we escape from connection handler.
 	defer func() {
@@ -623,22 +625,23 @@ func connListener(ip string) error {
 			msgType: System,
 		}
 		if err := listener.Close(); err != nil {
-			m.payload = []byte(fmt.Sprintf("Failed to Close Listener %q", err.Error()))
+			m.payload = []byte(fmt.Sprintf("ConnListener: Failed to Close Listener %q", err.Error()))
 			m.msgType = Error
 		}
 		m.msgType.WriteToChannel(m)
 	}()
 	// logs what socket the listener is bound to.
-	System.WriteToChannel(msg{payload: []byte(fmt.Sprintf("Listener bound to %v", listener.Addr()))})
+	System.WriteToChannel(msg{payload: []byte(fmt.Sprintf("ConnListener: Listener bound to %v", listener.Addr()))})
 	// handles incoming connectons.
 	for {
 		// logs that we are waiting for a connection.
-		System.WriteToChannel(msg{payload: []byte("Waiting for connection"), msgType: System})
+		System.WriteToChannel(msg{payload: []byte("ConnListener: Waiting for connection"), msgType: System})
 		// routine will hang here until a connection is accepted.
 		conn, err := listener.Accept()
 		if err != nil {
 			// if we fail to accept connection, we log the error and continue.
-			Error.WriteToChannel(msg{payload: []byte(fmt.Sprintf("Failed to accept connection: %q", err.Error()))})
+			Error.WriteToChannel(msg{payload: []byte(fmt.Sprintf("ConnListener: Failed to accept connection: %q", err.Error()))})
+			continue
 		}
 		// initializing connection object
 		newConn := connection{}
@@ -670,11 +673,6 @@ func connHandler(conn ConnectionHandler) {
 			payload: payload(branding.ColorString() +
 				"\n" + splashScreen()),
 		}) // writes branding to connection
-	// log start of new connection.
-	System.WriteToChannel(msg{
-		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
-		msgType: System,
-	})
 
 	// defering closing function until we escape from session handler.
 	defer func() {
@@ -706,29 +704,24 @@ func connHandler(conn ConnectionHandler) {
 					colorWrap(Purple, "%v"),
 				conn.GetConnectionId(),
 				string(m.GetPayload().String()))),
+			msgType: System,
 		})
 		// Catch trigger words, and handle each one differently.
 		switch {
-		case HasString(string(m.GetPayload().String()), "corgi"):
-			fmt.Print(corgi)
-			m.SetPayload(payload(fmt.Sprintf("%v", corgi)))
-			//Client.WriteToChannel(m)
-			continue
-		case HasString(m.GetPayload().String(), "ping"):
-			fmt.Println("pong")
-			m.SetPayload(payload("pong"))
-			//Client.WriteToChannel(m)
-			continue
-		case strings.Split(string(m.GetPayload().String()), ":")[0] == "ascii":
-			newPayload := payload(
-				figure.NewColorFigure(
-					// remove trailing newline
-					strings.Split(m.GetPayload().String(), ":")[1][:len(strings.Split(m.GetPayload().String(), ":")[1])-1],
-					"nancyj-fancy",
-					"Green", true).ColorString()) // sets payload to ascii art
-			m.SetPayload(newPayload)
+		case HasString(m.GetPayload().String(), ":"):
+			newPayload := parseAction(m)
+			m, err := InitMsg(newPayload, Client, route{source: Global, destination: Global}, conn.GetConnColor())
+			if err != nil {
+				Error.WriteToChannel(msg{payload: []byte(err.Error())})
+				return
+			}
 			Client.WriteToChannel(m)
 			continue
+		case HasString(m.GetPayload().String(), "corgi"):
+			Client.WriteToChannel(msg{
+				payload: payload(corgi),
+				msgType: System,
+			})
 		}
 		m.SetPayload(
 			payload(
@@ -736,6 +729,16 @@ func connHandler(conn ConnectionHandler) {
 					conn.GetConnectionId(),
 					string(m.ColorWrap()))))
 		Client.WriteToChannel(m) // write message to Client Channel
+	}
+}
+
+// returns payload based on action preceeding ":"
+func parseAction(m msg) payload {
+	switch strings.Split(m.GetPayload().String(), ":")[0] {
+	case "ascii":
+		return payload(figure.NewColorFigure(strings.Split(m.GetPayload().String(), ":")[1], "nancyj-fancy", "Green", true).ColorString())
+	default:
+		return payload(fmt.Sprintf("Invalid action: %v", strings.Split(m.GetPayload().String(), ":")[0]))
 	}
 }
 
@@ -751,6 +754,8 @@ func MessageBroker() {
 		select {
 		case m := <-clientChan:
 			// if globalState is full, pop first element and append new message.
+			newPayload := payload(fmt.Sprintf("%v\n", m.GetPayload()))
+			m.SetPayload(newPayload)
 			if len(globalState) == ClientMessageCount {
 				globalState = globalState[1:]
 				globalState = append(globalState, m)
@@ -787,7 +792,6 @@ func colorWrap(c Color, m string) string {
 
 // HasString returns true if a string contains another string
 func HasString(str, match string) bool {
-	match = fmt.Sprintf("(%v)", match)
-	bool, _ := regexp.MatchString(str, match)
+	bool, _ := regexp.MatchString(match, str)
 	return bool
 }
