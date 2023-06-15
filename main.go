@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -46,12 +47,14 @@ const (
 // ___ Global Variables ___
 
 var (
-	ip, netp, port, banner                                                            string
+	ip, netp, port, banner, banmsgfp, SpecialMessage                                  string
 	buffersize, logerTime, clientchannelbuffer, logchannelbuffer, systemchannelbuffer int
 	ClientMessageCount                                                                int // Sets limit for messages show to client
 	clientChan, logChan, sysChan                                                      ch  // Global Channels
 	currentstate                                                                      state
 	globalState                                                                       []msg
+	banmessages                                                                       []string // holds banner messages
+	ServerStartTime                                                                   time.Time
 )
 
 var (
@@ -62,6 +65,7 @@ var (
 
 // uses init function to set set up global flag variables, and channels.
 func init() {
+	ServerStartTime = time.Now()
 	// setting Global Flags
 	flag.StringVar(&ip, "ip", "127.0.0.1", "IP for server to listen on")
 	flag.StringVar(&netp, "netp", "tcp", "Network protocol to use")
@@ -73,6 +77,7 @@ func init() {
 	flag.IntVar(&logchannelbuffer, "logchannelbuffer", 20, "size of log channel buffer")
 	flag.IntVar(&systemchannelbuffer, "systemchannelbuffer", 20, "size of system channel buffer")
 	flag.IntVar(&ClientMessageCount, "ClientMessageCount", 20, "Number of messages to show to client")
+	flag.StringVar(&banmsgfp, "banmsgfp", "msg.txt", "Banner Message File Path")
 	flag.Parse()
 
 	globalState = make([]msg, 0, ClientMessageCount)
@@ -274,7 +279,13 @@ type ConnectionHandler interface {
 	Close() error                 // Exposes net.Conn Close method
 	LastMessage() msg             // Returns last message bundled in messageHistory
 	AppendHistory(msg)            // Appends message to message history
-	GetConnectionId() NID         // exposes ConnectionId
+	GetConnectionId() NID         // Gets ConnectionId
+	GetStartTime() time.Time      // Gets startTime
+}
+
+// Gets startTime
+func (c connection) GetStartTime() time.Time {
+	return c.startTime
 }
 
 // initializes connection object
@@ -390,7 +401,8 @@ func (s *state) WriteScreen() {
 	splash := splashScreen()
 	for _, c := range s.connections {
 		ClientMessage := c.GetSplashScreen()
-		newScreen := []byte(fmt.Sprintf("%v%v\n%v\n%v\n", clearScreen, coloredBranding, splash, ClientMessage))
+		RandomFacts := fmt.Sprintf("\"%v\"", SpecialMessage)
+		newScreen := []byte(fmt.Sprintf("%v%v\n%v\n%v%v\n", clearScreen, coloredBranding, splash, ClientMessage, printWithBorder(RandomFacts)))
 		for _, m := range globalState {
 			newScreen = append(newScreen, m.GetPayload()...)
 		}
@@ -598,7 +610,7 @@ func main() {
 	}
 	fmt.Print(corgi)
 	var wg sync.WaitGroup
-	wg.Add(2) // adding two goroutines
+	wg.Add(3) // adding two goroutines
 	go func() {
 		MessageBroker() // starting the Event Handler go routine
 		wg.Done()       // decrementing the counter when done
@@ -606,6 +618,10 @@ func main() {
 	go func() {
 		connListener(ip)
 		wg.Done() // decrementing the counter when done
+	}()
+	go func() {
+		FactGenerator()
+		wg.Done()
 	}()
 	wg.Wait() // waiting for all goroutines to finish
 }
@@ -667,7 +683,7 @@ func connHandler(conn ConnectionHandler) {
 		msg{
 			payload: payload(clearScreen),
 		})
-	// Display Servier Branding message.
+	// Display server branding message.
 	conn.Write(
 		msg{
 			payload: payload(branding.ColorString() +
@@ -780,7 +796,7 @@ func splashScreen() string {
 		Green, fmt.Sprintf(
 			"There are currently %v active connections.", currentstate.ActiveConnections()))
 	directions := colorWrap(Purple, "Type 'ascii:' before your message to display ascii art")
-	splashmessage := fmt.Sprintf("\t\t%v\n\t  %v\n  %v\v\n", welcome, activeconn, directions)
+	splashmessage := fmt.Sprintf("\t\t%v\n\t  %v\n  %v\v", welcome, activeconn, directions)
 	return splashmessage
 }
 
@@ -794,4 +810,43 @@ func colorWrap(c Color, m string) string {
 func HasString(str, match string) bool {
 	bool, _ := regexp.MatchString(match, str)
 	return bool
+}
+
+// Sets Strings that are attached to the Voids Banner.
+func FactGenerator() {
+	// Switch statement that takes in the current time and performs actions based on the time.
+	var BannerMessages []string
+	defer func() {
+		msg := msg{
+			payload: []byte("Fact Generator Closed"),
+			msgType: System,
+		}
+		msg.msgType.WriteToChannel(msg)
+	}()
+	FileContents, err := ioutil.ReadFile(banmsgfp)
+	if err != nil {
+		Error.WriteToChannel(msg{payload: []byte(err.Error())})
+	} else {
+		BannerMessages = strings.Split(string(FileContents), "\n")
+		SpecialMessage = BannerMessages[rand.Intn(len(BannerMessages))]
+	}
+	for {
+		time.AfterFunc(1*time.Minute, func() {
+			FileContents, err = ioutil.ReadFile(banmsgfp)
+			if err != nil {
+				Error.WriteToChannel(msg{payload: []byte(err.Error())})
+				return
+			}
+			BannerMessages = strings.Split(string(FileContents), "\n")
+		})
+
+		time.AfterFunc(3*time.Minute, func() {
+			SpecialMessage = BannerMessages[rand.Intn(len(BannerMessages))]
+		})
+	}
+}
+
+func printWithBorder(text string) string {
+	horizontalBorder := "+" + strings.Repeat("-", len(text)+2) + "+"
+	return fmt.Sprintf("%v\n| %v |\n%v", horizontalBorder, text, horizontalBorder)
 }
