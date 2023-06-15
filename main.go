@@ -15,7 +15,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -401,8 +400,10 @@ func (s *state) WriteScreen() {
 	splash := splashScreen()
 	for _, c := range s.connections {
 		ClientMessage := c.GetSplashScreen()
-		RandomFacts := fmt.Sprintf("\"%v\"", SpecialMessage)
-		newScreen := []byte(fmt.Sprintf("%v%v\n%v\n%v%v\n", clearScreen, coloredBranding, splash, ClientMessage, printWithBorder(RandomFacts)))
+		// RandomFacts := fmt.Sprintf("\"%v\"", SpecialMessage)
+		newScreen := []byte(fmt.Sprintf("%v%v\n%v\n%v\n", clearScreen, coloredBranding, splash, ClientMessage))
+		// newScreen := []byte(fmt.Sprintf("%v%v\n%v\n%v%v\n", clearScreen, coloredBranding, splash, ClientMessage, printWithBorder(RandomFacts)))
+
 		for _, m := range globalState {
 			newScreen = append(newScreen, m.GetPayload()...)
 		}
@@ -610,7 +611,7 @@ func main() {
 	}
 	fmt.Print(corgi)
 	var wg sync.WaitGroup
-	wg.Add(3) // adding two goroutines
+	wg.Add(2) // adding two goroutines
 	go func() {
 		MessageBroker() // starting the Event Handler go routine
 		wg.Done()       // decrementing the counter when done
@@ -619,10 +620,10 @@ func main() {
 		connListener(ip)
 		wg.Done() // decrementing the counter when done
 	}()
-	go func() {
-		FactGenerator()
-		wg.Done()
-	}()
+	// go func() {
+	// 	FactGenerator()
+	// 	wg.Done()
+	// }()
 	wg.Wait() // waiting for all goroutines to finish
 }
 
@@ -812,41 +813,41 @@ func HasString(str, match string) bool {
 	return bool
 }
 
-// Sets Strings that are attached to the Voids Banner.
-func FactGenerator() {
-	// Switch statement that takes in the current time and performs actions based on the time.
-	var BannerMessages []string
-	defer func() {
-		msg := msg{
-			payload: []byte("Fact Generator Closed"),
-			msgType: System,
-		}
-		msg.msgType.WriteToChannel(msg)
-	}()
-	FileContents, err := ioutil.ReadFile(banmsgfp)
-	if err != nil {
-		Error.WriteToChannel(msg{payload: []byte(err.Error())})
-	} else {
-		BannerMessages = strings.Split(string(FileContents), "\n")
-		SpecialMessage = BannerMessages[rand.Intn(len(BannerMessages))]
-	}
-	for {
-		time.AfterFunc(1*time.Minute, func() {
-			FileContents, err = ioutil.ReadFile(banmsgfp)
-			if err != nil {
-				Error.WriteToChannel(msg{payload: []byte(err.Error())})
-				return
-			}
-			BannerMessages = strings.Split(string(FileContents), "\n")
-		})
+// // Sets Strings that are attached to the Voids Banner.
+// func FactGenerator() {
+// 	// Switch statement that takes in the current time and performs actions based on the time.
+// 	var BannerMessages []string
+// 	defer func() {
+// 		msg := msg{
+// 			payload: []byte("Fact Generator Closed"),
+// 			msgType: System,
+// 		}
+// 		msg.msgType.WriteToChannel(msg)
+// 	}()
+// 	FileContents, err := ioutil.ReadFile(banmsgfp)
+// 	if err != nil {
+// 		Error.WriteToChannel(msg{payload: []byte(err.Error())})
+// 	} else {
+// 		BannerMessages = strings.Split(string(FileContents), "\n")
+// 		SpecialMessage = BannerMessages[rand.Intn(len(BannerMessages))]
+// 	}
+// 	for {
+// 		time.AfterFunc(1*time.Minute, func() {
+// 			FileContents, err = ioutil.ReadFile(banmsgfp)
+// 			if err != nil {
+// 				Error.WriteToChannel(msg{payload: []byte(err.Error())})
+// 				return
+// 			}
+// 			BannerMessages = strings.Split(string(FileContents), "\n")
+// 		})
 
-		time.AfterFunc(3*time.Minute, func() {
-			SpecialMessage = BannerMessages[rand.Intn(len(BannerMessages))]
-		})
-	}
-}
+// 		time.AfterFunc(3*time.Minute, func() {
+// 			SpecialMessage = BannerMessages[rand.Intn(len(BannerMessages))]
+// 		})
+// 	}
+// }
 
-func printWithBorder(text string) string {
-	horizontalBorder := "+" + strings.Repeat("-", len(text)+2) + "+"
-	return fmt.Sprintf("%v\n| %v |\n%v", horizontalBorder, text, horizontalBorder)
-}
+// func printWithBorder(text string) string {
+// 	horizontalBorder := "+" + strings.Repeat("-", len(text)+2) + "+"
+// 	return fmt.Sprintf("%v\n| %v |\n%v", horizontalBorder, text, horizontalBorder)
+// }
