@@ -1,10 +1,14 @@
 package main
 
-// TODO(jeanhaley) - The following items need to be addressed:
+// TODO(jeanhaley) - The following items need to be addressed
+// 0. Generate a random color for each user access the Void.
 // 1. Create a logging system, that will handle all logging for this server.
 // 2. maybe breakup message broker into a log handler? also, why are we distinguishing between log and system?
 //    Maybe they should be treated the same?
 // 2. Create a routine that handles global messages, and sends a screen state to all clients.
+// 		1. How about we create a unique banne for each user, that pulls from unique user stats, and
+// 			 references certain global variables.
+// 		2. Add cat-facts into the banner.
 // 3. Create a system to handle the state of the server, and the state of the clients.
 // 4. Create a better method of wrapping errors in error messages, to make routing them easier.
 import (
@@ -15,6 +19,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -776,4 +781,11 @@ func splashScreen() string {
 func colorWrap(c Color, m string) string {
 	const Reset = "\033[0m"
 	return c.Color() + m + Reset
+}
+
+// HasString returns true if a string contains another string
+func HasString(str, match string) bool {
+	match = fmt.Sprintf("(%v)", match)
+	bool, _ := regexp.MatchString(str, match)
+	return bool
 }
