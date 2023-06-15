@@ -301,7 +301,7 @@ func (c connection) GetSplashScreen() string {
 
 // randomly chooses a color to represent this connection
 func (c *connection) ChooseConnColor() {
-	rand.Seed(time.Now().UnixNano())
+	rand.NewSource(time.Now().UnixNano())
 	// this is used to color code messages from this connection.
 	c.connColor = Color(rand.Intn(17))
 }
@@ -709,11 +709,11 @@ func connHandler(conn ConnectionHandler) {
 		})
 		// Catch trigger words, and handle each one differently.
 		switch {
-		case m.GetPayload().String() == "corgi":
+		case HasString(string(m.GetPayload().String()), "corgi"):
 			m.SetPayload(payload(fmt.Sprintf("%v", corgi)))
 			//Client.WriteToChannel(m)
 			continue
-		case m.GetPayload().String() == "ping":
+		case HasString(m.GetPayload().String(), "ping"):
 			m.SetPayload(payload("pong"))
 			//Client.WriteToChannel(m)
 			continue
