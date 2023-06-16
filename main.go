@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -839,8 +840,34 @@ func HasString(str, match string) bool {
 	return bool
 }
 
+// TimeKeeper is used to keep track of time, and perform actions based on time.
 func TimeKeeper() {
+	System.WriteToChannel(msg{payload: []byte("TimeKeeper: Starting TimeKeeper")})
+	var catMessages []string
+	SpecialMessage = "Awaiting new Cat Message within 5 minutes."
+	fivesecond := time.NewTicker(5 * time.Second) // five second ticker
+	fiveminute := time.NewTicker(5 * time.Minute) // five minute ticker
+	defer func() {
+		System.LogPayload(timekeeper, "Closing TimeKeeper")
+		fivesecond.Stop()
+		fiveminute.Stop()
+	}()
+	for {
+		select {
+		case <-fivesecond.C:
+			bytes, err := ioutil.ReadFile(banmsgfp) // read banner message file
+			if err != nil {
+				Error.LogError(timekeeper, fmt.Sprintf("Read failed(%v): %v", banmsgfp, err.Error()))
+			}
+			catMessages = strings.Split(string(bytes), "\n") // split banner message file into slice
+		case <-fiveminute.C:
+			System.WriteToChannel(msg{payload: []byte("TimeKeeper: 5 minutes have passed. Setting a new message")})
+			SpecialMessage = catMessages[rand.Intn(len(catMessages))] // choose random message from slice
+			System.WriteToChannel(msg{payload: []byte("Choosing new cat message. '" + SpecialMessage + "")})
 
+		}
+
+	}
 }
 
 // FuncTimer is used to run a function on a timer.
@@ -849,27 +876,3 @@ func printWithBorder(text string) string {
 	horizontalBorder := "+" + strings.Repeat("-", len(text)+2) + "+"
 	return fmt.Sprintf("%v\n| %v |\n%v", horizontalBorder, text, horizontalBorder)
 }
-
-// // TimeKeeper is used to keep track of time, and perform actions based on time.
-// // this only runs once, Need to user time.NewTicker, or time.Tick to do what it is I
-// // want to do.
-// func TimeKeeper() {
-// 	System.WriteToChannel(msg{payload: []byte("TimeKeeper: Starting TimeKeeper")})
-// 	var catMessages []string
-// 	SpecialMessage = "Awaiting new Cat Message within 5 minutes."
-// 	System.WriteToChannel(msg{payload: []byte("Initialized First Cat")})
-// 	// Actions performed every 5 seconds.
-// 	time.AfterFunc(time.Duration(5)*time.Second, func() {
-// 		bytes, err := ioutil.ReadFile(banmsgfp)
-// 		if err != nil {
-// 			Error.WriteToChannel(msg{payload: []byte(
-// 				fmt.Sprintf("TimeKeeper: Read failed(%v): %v", banmsgfp, err.Error()))})
-// 		}
-// 		catMessages = strings.Split(string(bytes), "\n")
-// 	})
-// 	time.AfterFunc(time.Duration(10)*time.Second, func() {
-// 		System.WriteToChannel(msg{payload: []byte("TimeKeeper: 5 minutes have passed.")})
-// 		SpecialMessage = catMessages[rand.Intn(len(catMessages))]
-// 		System.WriteToChannel(msg{payload: []byte("Choosing new cat message. '" + SpecialMessage + "")})
-// 	})
-// }
