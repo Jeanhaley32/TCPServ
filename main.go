@@ -15,7 +15,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -89,11 +88,6 @@ func init() {
 
 }
 
-type tickers struct {
-	// ticker used to log server status
-	loger *time.Ticker
-}
-
 // ___ Global Channel Variables ___
 // create a channel type with blank interface
 type ch chan msg
@@ -159,6 +153,27 @@ func (m MsgEnumType) GetChannel() ch {
 func (m MsgEnumType) WriteToChannel(a msg) {
 	a.SetType(m)
 	m.GetChannel() <- a
+}
+
+// Logs Payload, does not write to Client.
+// Used for logging purposes.
+func (m MsgEnumType) LogPayload(s NID, p string) {
+	System.WriteToChannel(
+		msg{
+			payload: payload(fmt.Sprintf("%v: %v", s.Name(), p)),
+			source:  s,
+		},
+	)
+}
+
+// Error Logging Payload, does not write to Client.
+func (m MsgEnumType) LogError(s NID, p string) {
+	Error.WriteToChannel(
+		msg{
+			payload: payload(fmt.Sprintf("%v:%v", s.Name(), p)),
+			source:  s,
+		},
+	)
 }
 
 // Reads from Channel.
@@ -235,7 +250,9 @@ func (c Color) Color() string {
 type timestamp string
 
 // Defining UID types.
-// Node is any node that can send or receive messages, be it a client, server, or goroutine.
+// Node is any node that can send or receive messages, be it a client,or goroutine.
+// Server is any server that can send or receive messages, and is used to identify a server for
+// logging purposes.
 // Message is any message sent or received by a node.
 type (
 	UID   uint32
@@ -252,10 +269,32 @@ func (m MsgID) IdType() string {
 	return "message"
 }
 
-// Define Enum for noClient UID
+// Define Enum for commonly used
 const (
-	Global NID = 0
+	Global NID = iota
+	connlistener
+	connhandler
+	timekeeper
+	messagebroker
 )
+
+// Returns name of node
+func (c NID) Name() string {
+	switch c {
+	case Global:
+		return "Global"
+	case connlistener:
+		return "listener"
+	case connhandler:
+		return "Handler"
+	case timekeeper:
+		return "Timekeeper"
+	case messagebroker:
+		return "MessageBroker"
+	default:
+		return fmt.Sprintf("Node%v", c)
+	}
+}
 
 // Defines a bundle of channels used for a connections communications
 type cnchanbundle struct {
@@ -637,31 +676,26 @@ func connListener(ip string) error {
 	listener, err := net.Listen(netp, net.JoinHostPort(ip, port))
 	if err != nil {
 		// if we fail to create listener, we log the error and exit. This is a fatal error.
-		log.Fatalf("ConnListener: Failed to create listener: %q", err)
+		log.Fatalf("%v: Failed to create listener: %q", connlistener.Name(), err)
 	}
 	// defer closing of listener until we escape from connection handler.
 	defer func() {
-		m := msg{
-			payload: []byte("Listener Closed"),
-			msgType: System,
-		}
+		System.LogPayload(connlistener, "Closing Listener")
 		if err := listener.Close(); err != nil {
-			m.payload = []byte(fmt.Sprintf("ConnListener: Failed to Close Listener %q", err.Error()))
-			m.msgType = Error
+			Error.LogError(connlistener, fmt.Sprintf("Failed to Close Listener %q", err.Error()))
 		}
-		m.msgType.WriteToChannel(m)
 	}()
 	// logs what socket the listener is bound to.
-	System.WriteToChannel(msg{payload: []byte(fmt.Sprintf("ConnListener: Listener bound to %v", listener.Addr()))})
+	System.LogPayload(connlistener, fmt.Sprintf("Listener bound to %v", listener.Addr()))
 	// handles incoming connectons.
 	for {
 		// logs that we are waiting for a connection.
-		System.WriteToChannel(msg{payload: []byte("ConnListener: Waiting for connection"), msgType: System})
+		System.LogPayload(connlistener, "Waiting for connection")
 		// routine will hang here until a connection is accepted.
 		conn, err := listener.Accept()
 		if err != nil {
 			// if we fail to accept connection, we log the error and continue.
-			Error.WriteToChannel(msg{payload: []byte(fmt.Sprintf("ConnListener: Failed to accept connection: %q", err.Error()))})
+			Error.LogError(connlistener, fmt.Sprintf("Failed to accept connection: %q", err.Error()))
 			continue
 		}
 		// initializing connection object
@@ -679,10 +713,7 @@ func connListener(ip string) error {
 // TODO(jeanhaley): This function is a bit out of control, and needs to be refactored.
 func connHandler(conn ConnectionHandler) {
 	// Log new Connection.
-	System.WriteToChannel(msg{
-		payload: []byte(fmt.Sprintf("New connection from %v", conn.GetConnectionId())),
-		msgType: System,
-	})
+	System.LogPayload(connhandler, fmt.Sprintf("New connection from %v", conn.GetConnectionId()))
 	// Send message to clearn new connection screen.
 	conn.Write(
 		msg{
@@ -697,7 +728,7 @@ func connHandler(conn ConnectionHandler) {
 
 	// defering closing function until we escape from session handler.
 	defer func() {
-		System.WriteToChannel(msg{payload: []byte(fmt.Sprintf("Closing connection from %v", conn.GetConnectionId()))})
+		System.LogPayload(connhandler, fmt.Sprintf("Closing connection from %v", conn.GetConnectionId()))
 		// TODO(JeanHaley) Create a state handler(manager?) that can close this for us.
 		// we should send a signal through an explicit connection channel to
 		// the state handler that then tells it to close this connection and
@@ -709,31 +740,22 @@ func connHandler(conn ConnectionHandler) {
 		m, err := conn.ReadMsg() // read message from connection
 		if err != nil {
 			if err == io.EOF {
-				System.WriteToChannel(msg{
-					payload: []byte(fmt.Sprintf("Received EOF from %v .", conn.GetConnectionId())),
-				})
+				System.LogPayload(connhandler, fmt.Sprintf("Received EOF from %v .", conn.GetConnectionId()))
 				return
 			} else {
-				Error.WriteToChannel(msg{payload: []byte(err.Error())})
+				Error.LogError(connhandler, err.Error())
 				return
 			}
 		}
 		// Log message received
-		System.WriteToChannel(msg{
-			payload: payload(fmt.Sprintf(
-				"(%v)Received message: "+
-					colorWrap(Purple, "%v"),
-				conn.GetConnectionId(),
-				string(m.GetPayload().String()))),
-			msgType: System,
-		})
+		System.LogPayload(connhandler, fmt.Sprintf("(%v)Received message:"+colorWrap(Purple, "%v"), conn.GetConnectionId(), string(m.GetPayload().String())))
 		// Catch trigger words, and handle each one differently.
 		switch {
 		case HasString(m.GetPayload().String(), ":"):
 			newPayload := parseAction(m)
 			m, err := InitMsg(newPayload, Client, route{source: Global, destination: Global}, conn.GetConnColor())
 			if err != nil {
-				Error.WriteToChannel(msg{payload: []byte(err.Error())})
+				Error.Type().LogError(connhandler, err.Error())
 				return
 			}
 			Client.WriteToChannel(m)
@@ -817,28 +839,8 @@ func HasString(str, match string) bool {
 	return bool
 }
 
-// TimeKeeper is used to keep track of time, and perform actions based on time.
-// this only runs once, Need to user time.NewTicker, or time.Tick to do what it is I
-// want to do.
 func TimeKeeper() {
-	System.WriteToChannel(msg{payload: []byte("TimeKeeper: Starting TimeKeeper")})
-	var catMessages []string
-	SpecialMessage = "Awaiting new Cat Message within 5 minutes."
-	System.WriteToChannel(msg{payload: []byte("Initialized First Cat")})
-	// Actions performed every 5 seconds.
-	time.AfterFunc(time.Duration(5)*time.Second, func() {
-		bytes, err := ioutil.ReadFile(banmsgfp)
-		if err != nil {
-			Error.WriteToChannel(msg{payload: []byte(
-				fmt.Sprintf("TimeKeeper: Read failed(%v): %v", banmsgfp, err.Error()))})
-		}
-		catMessages = strings.Split(string(bytes), "\n")
-	})
-	time.AfterFunc(time.Duration(10)*time.Second, func() {
-		System.WriteToChannel(msg{payload: []byte("TimeKeeper: 5 minutes have passed.")})
-		SpecialMessage = catMessages[rand.Intn(len(catMessages))]
-		System.WriteToChannel(msg{payload: []byte("Choosing new cat message. '" + SpecialMessage + "")})
-	})
+
 }
 
 // FuncTimer is used to run a function on a timer.
@@ -847,3 +849,27 @@ func printWithBorder(text string) string {
 	horizontalBorder := "+" + strings.Repeat("-", len(text)+2) + "+"
 	return fmt.Sprintf("%v\n| %v |\n%v", horizontalBorder, text, horizontalBorder)
 }
+
+// // TimeKeeper is used to keep track of time, and perform actions based on time.
+// // this only runs once, Need to user time.NewTicker, or time.Tick to do what it is I
+// // want to do.
+// func TimeKeeper() {
+// 	System.WriteToChannel(msg{payload: []byte("TimeKeeper: Starting TimeKeeper")})
+// 	var catMessages []string
+// 	SpecialMessage = "Awaiting new Cat Message within 5 minutes."
+// 	System.WriteToChannel(msg{payload: []byte("Initialized First Cat")})
+// 	// Actions performed every 5 seconds.
+// 	time.AfterFunc(time.Duration(5)*time.Second, func() {
+// 		bytes, err := ioutil.ReadFile(banmsgfp)
+// 		if err != nil {
+// 			Error.WriteToChannel(msg{payload: []byte(
+// 				fmt.Sprintf("TimeKeeper: Read failed(%v): %v", banmsgfp, err.Error()))})
+// 		}
+// 		catMessages = strings.Split(string(bytes), "\n")
+// 	})
+// 	time.AfterFunc(time.Duration(10)*time.Second, func() {
+// 		System.WriteToChannel(msg{payload: []byte("TimeKeeper: 5 minutes have passed.")})
+// 		SpecialMessage = catMessages[rand.Intn(len(catMessages))]
+// 		System.WriteToChannel(msg{payload: []byte("Choosing new cat message. '" + SpecialMessage + "")})
+// 	})
+// }
