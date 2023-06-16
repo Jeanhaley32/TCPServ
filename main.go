@@ -1,16 +1,7 @@
 package main
 
 // TODO(jeanhaley) - The following items need to be addressed
-// 0. Generate a random color for each user access the Void.
-// 1. Create a logging system, that will handle all logging for this server.
-// 2. maybe breakup message broker into a log handler? also, why are we distinguishing between log and system?
-//    Maybe they should be treated the same?
-// 2. Create a routine that handles global messages, and sends a screen state to all clients.
-// 		1. How about we create a unique banne for each user, that pulls from unique user stats, and
-// 			 references certain global variables.
-// 		2. Add cat-facts into the banner.
-// 3. Create a system to handle the state of the server, and the state of the clients.
-// 4. Create a better method of wrapping errors in error messages, to make routing them easier.
+// Refactor Code, then figure out what to do with it.
 import (
 	"flag"
 	"fmt"
@@ -854,6 +845,8 @@ func TimeKeeper() {
 	}()
 	for {
 		select {
+		// We ingest the file ever five seconds, and populat the catMessages slice.
+		// This way we can live update the banner message file.
 		case <-fivesecond.C:
 			bytes, err := ioutil.ReadFile(banmsgfp) // read banner message file
 			if err != nil {
