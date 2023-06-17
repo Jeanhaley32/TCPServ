@@ -1,4 +1,4 @@
-module theVoid
+module thevoid
 
 go 1.20
 
