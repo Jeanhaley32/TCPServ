@@ -124,8 +124,7 @@ func HasString(str, match string) bool {
 	return bool
 }
 
-// FuncTimer is used to run a function on a timer.
-
+// Prints text with border
 func printWithBorder(text string) string {
 	horizontalBorder := "+" + strings.Repeat("-", len(text)+2) + "+"
 	return fmt.Sprintf("%v\n| %v |\n%v", horizontalBorder, text, horizontalBorder)
