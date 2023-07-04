@@ -56,7 +56,7 @@ func init() {
 	flag.StringVar(&port, "port", "6000", "Port for server to listen on")
 	flag.IntVar(&buffersize, "bufferSize", 1024, "Message Buffer size.")
 	flag.IntVar(&logerTime, "logerTime", 120, "time in between server status check, in seconds.")
-	flag.StringVar(&banner, "banner", "TheVoid", "Banner to display on startup")
+	flag.StringVar(&banner, "banner", "TCPServ", "Banner to display on startup")
 	flag.IntVar(&clientchannelbuffer, "clientchannelbuffer", 20, "size of client channel buffer")
 	flag.IntVar(&logchannelbuffer, "logchannelbuffer", 20, "size of log channel buffer")
 	flag.IntVar(&systemchannelbuffer, "systemchannelbuffer", 20, "size of system channel buffer")
