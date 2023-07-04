@@ -8,4 +8,5 @@
     - ATM, ingests msg.txt every 5 seconds, and update a list of messages.
     - ever 5 minutes, it uses a random int to pick a message to add to the global banner. 
 
-![]()
+## Example Server Side Logging
+![](out.gif)
