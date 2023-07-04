@@ -1,4 +1,4 @@
-# theVoid
+# TCPServ
  Scream into the Void. A simple TCP server that reflects all received traffic to everyone connected.
  - Handles incoming TCP connections. 
  - Wraps received []byte into messages
@@ -10,3 +10,6 @@
 
 ## Example Server Side Logging
 ![](out.gif)
+
+## What the Client sees (NetCat connection)
+![](client.gif)
