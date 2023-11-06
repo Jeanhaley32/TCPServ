@@ -1,14 +1,14 @@
 What is this?\
-  At it's simplest, and most utilitarian. TCP Serve acts as a very feature incomplete chat service. Multiple peope can connect to it using 
- the accompanying client application, or a simple netcat command to the IP and port. It takes in raw TCP packets as bytes, and reflects 
- them to every other connection already connected to it.
+ At it's simplest, and most utilitarian, TCP Serve acts as a very feature incomplete chat service. Multiple clients can connect to it 
+ using either the accompanying client application, or a simple netcat command to the IP and port. It takes in raw TCP packets as bytes,
+ and reflects them to every other client with an active connection.
 
- 
-  TCP Serve is a project I worked at during NYUs ITP Camp in 2023. 
- The purpose of this project was to learn some entry level server programming with go, create an application that
- would have me utilize both GoRoutines and Channels from a approach that had me think with micro-services. =
+
+ TCP Serve is a project I worked at during NYUs ITP Camp in 2023. 
+ The purpose of this project was to learn some entry level server programming with Go and create an application that
+ would have me utilize both GoRoutines and Channels from a micro-services centric approach.
  Although this program itself is monolithic, I attempted to approach the concept of parralel running goroutines as if they were seperate
- services communicating,depending on each other, working together to accomplish a single objective. 
+ services communicating with and depending on each other, working together to accomplish a single objective. 
  
 # TCPServ
  Scream into the Void. A simple TCP server that reflects all received traffic to everyone connected.
