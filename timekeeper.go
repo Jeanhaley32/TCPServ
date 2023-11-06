@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TimeKeeper is used to keep track of time, and perform actions based on time.
+// TimeKeeper i used to trigger timed events.
 func TimeKeeper() {
 	System.WriteToChannel(msg{payload: []byte("TimeKeeper: Starting TimeKeeper")})
 	var catMessages []string
