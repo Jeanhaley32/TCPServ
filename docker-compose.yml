@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  tcpserv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "6000:6000"
+    environment:
+      - PORT=6000
