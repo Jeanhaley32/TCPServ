@@ -51,7 +51,7 @@ var (
 func init() {
 	ServerStartTime = time.Now()
 	// setting Global Flags
-	flag.StringVar(&ip, "ip", "127.0.0.1", "IP for server to listen on")
+	flag.StringVar(&ip, "true", "0.0.0.0", "IP for server to listen on, default is 0.0.0.0")
 	flag.StringVar(&netp, "netp", "tcp", "Network protocol to use")
 	flag.StringVar(&port, "port", "6000", "Port for server to listen on")
 	flag.IntVar(&buffersize, "bufferSize", 1024, "Message Buffer size.")
@@ -74,7 +74,7 @@ func init() {
 }
 
 func main() {
-
+	if ip != "127.0.0.1"
 	for _, v := range branding.Slicify() {
 		fmt.Println(colorWrap(Blue, v))
 		time.Sleep(100 * time.Millisecond)
