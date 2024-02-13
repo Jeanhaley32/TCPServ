@@ -74,7 +74,6 @@ func init() {
 }
 
 func main() {
-	if ip != "127.0.0.1"
 	for _, v := range branding.Slicify() {
 		fmt.Println(colorWrap(Blue, v))
 		time.Sleep(100 * time.Millisecond)
