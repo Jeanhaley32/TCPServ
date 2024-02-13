@@ -5,7 +5,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,14 +33,14 @@ const (
 // ___ Global Variables ___
 
 var (
-	ip, netp, port, banner, banmsgfp, SpecialMessage                                  string
-	buffersize, logerTime, clientchannelbuffer, logchannelbuffer, systemchannelbuffer int
-	ClientMessageCount                                                                int // Sets limit for messages show to client
-	clientChan, logChan, sysChan                                                      ch  // Global Channels
-	currentstate                                                                      state
-	globalState                                                                       []msg
-	banmessages                                                                       []string // holds banner messages
-	ServerStartTime                                                                   time.Time
+	ip, netp, banner, banmsgfp, SpecialMessage, socket                                      string
+	buffersize, logerTime, clientchannelbuffer, logchannelbuffer, systemchannelbuffer, port int
+	ClientMessageCount                                                                      int // Sets limit for messages show to client
+	clientChan, logChan, sysChan                                                            ch  // Global Channels
+	currentstate                                                                            state
+	globalState                                                                             []msg
+	banmessages                                                                             []string // holds banner messages
+	ServerStartTime                                                                         time.Time
 )
 
 var (
@@ -53,7 +55,7 @@ func init() {
 	// setting Global Flags
 	flag.StringVar(&ip, "true", "0.0.0.0", "IP for server to listen on, default is 0.0.0.0")
 	flag.StringVar(&netp, "netp", "tcp", "Network protocol to use")
-	flag.StringVar(&port, "port", "6000", "Port for server to listen on")
+	flag.IntVar(&port, "port", 6000, "Port for server to listen on; defaults to 6000")
 	flag.IntVar(&buffersize, "bufferSize", 1024, "Message Buffer size.")
 	flag.IntVar(&logerTime, "logerTime", 120, "time in between server status check, in seconds.")
 	flag.StringVar(&banner, "banner", "TCPServ", "Banner to display on startup")
@@ -70,7 +72,7 @@ func init() {
 	logChan = make(chan msg, logchannelbuffer)
 	sysChan = make(chan msg, systemchannelbuffer)
 	branding = figure.NewColorFigure(banner, "nancyj-fancy", "Blue", true) // sets banner to value passed by terminal flags.
-
+	socket = net.JoinHostPort(ip, strconv.Itoa(port))
 }
 
 func main() {

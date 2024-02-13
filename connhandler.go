@@ -108,7 +108,7 @@ func (c *connection) generateUid() {
 // Connection Listener accepts and passes connections off to Connection Handler
 func connListener(ip string) error {
 	// Create Listener bound to socket.
-	listener, err := net.Listen(netp, net.JoinHostPort(ip, port))
+	listener, err := net.Listen(netp, socket)
 	if err != nil {
 		// if we fail to create listener, we log the error and exit. This is a fatal error.
 		log.Fatalf("%v: Failed to create listener: %q", connlistener.Name(), err)
