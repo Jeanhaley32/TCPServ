@@ -4,8 +4,8 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 )
@@ -27,7 +27,7 @@ func TimeKeeper() {
 		// We ingest the file ever five seconds, and populat the catMessages slice.
 		// This way we can live update the banner message file.
 		case <-fivesecond.C:
-			bytes, err := ioutil.ReadFile(banmsgfp) // read banner message file
+			bytes, err := os.ReadFile(banmsgfp) // read banner message file
 			if err != nil {
 				Error.LogError(timekeeper, fmt.Sprintf("Read failed(%v): %v", banmsgfp, err.Error()))
 			}
