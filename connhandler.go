@@ -221,7 +221,7 @@ func connHandler(conn ConnectionHandler) {
 			m, err := InitMsg(newPayload, Client, route{source: Global, destination: Global}, conn.GetConnColor())
 			if err != nil {
 				Error.Type().LogError(connhandler, err.Error())
-				return
+				m.payload = []byte(err.Error())
 			}
 			Client.WriteToChannel(m)
 			continue
