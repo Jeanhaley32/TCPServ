@@ -105,7 +105,7 @@ func parseAction(m msg) payload {
 	switch strings.Split(m.GetPayload().String(), ":")[0] {
 	case "ascii":
 		byteMsg := m.payload
-		if byteMsg[len(byteMsg)-1] == telnet {
+		if len(string(byteMsg[len(byteMsg)-1])) != 8 {
 			byteMsg = byteMsg[:len(byteMsg)-1]
 		}
 		ascii := figure.NewColorFigure(strings.Split(byteMsg.String(), ":")[1], "nancyj-fancy", "Green", true)
