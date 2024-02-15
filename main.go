@@ -39,7 +39,6 @@ var (
 	clientChan, logChan, sysChan                                                            ch  // Global Channels
 	currentstate                                                                            state
 	globalState                                                                             []msg
-	banmessages                                                                             []string // holds banner messages
 	ServerStartTime                                                                         time.Time
 )
 
@@ -48,7 +47,6 @@ var (
 	// this needs to be done, because the type figure.figure is not exported.
 	branding = figure.NewColorFigure("", "nancyj-fancy", "Blue", true)
 	// Carraige return for Windows.
-	telnet uint8 = 13
 )
 
 // uses init function to set set up global flag variables, and channels.
@@ -85,6 +83,7 @@ func main() {
 	fmt.Print(corgi)
 	var wg sync.WaitGroup
 	wg.Add(3) // adding two goroutines
+	// Handle panicked state. Logs and recovers from panic
 	go func() {
 		MessageBroker() // starting the Event Handler go routine
 		wg.Done()       // decrementing the counter when done

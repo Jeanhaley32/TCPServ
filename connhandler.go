@@ -218,7 +218,6 @@ func connHandler(conn ConnectionHandler) {
 		switch {
 		case HasString(m.GetPayload().String(), ":"):
 			newPayload := parseAction(m)
-			fmt.Println("finished generating ascii figure")
 			m, err := InitMsg(newPayload, Client, route{source: Global, destination: Global}, conn.GetConnColor())
 			if err != nil {
 				Error.Type().LogError(connhandler, err.Error())
