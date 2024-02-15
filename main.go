@@ -47,6 +47,8 @@ var (
 	// creating a blank global branding variable.
 	// this needs to be done, because the type figure.figure is not exported.
 	branding = figure.NewColorFigure("", "nancyj-fancy", "Blue", true)
+	// Carraige return for Windows.
+	telnet uint8 = 13
 )
 
 // uses init function to set set up global flag variables, and channels.
@@ -102,7 +104,13 @@ func main() {
 func parseAction(m msg) payload {
 	switch strings.Split(m.GetPayload().String(), ":")[0] {
 	case "ascii":
-		return payload(figure.NewColorFigure(strings.Split(m.GetPayload().String(), ":")[1], "nancyj-fancy", "Green", true).ColorString())
+		byteMsg := m.payload
+		if byteMsg[len(byteMsg)-1] == telnet {
+			byteMsg = byteMsg[:len(byteMsg)-1]
+		}
+		ascii := figure.NewColorFigure(strings.Split(byteMsg.String(), ":")[1], "nancyj-fancy", "Green", true)
+		asciiMsg := ascii.ColorString()
+		return payload(asciiMsg)
 	default:
 		return payload(fmt.Sprintf("Invalid action: %v", strings.Split(m.GetPayload().String(), ":")[0]))
 	}
@@ -121,7 +129,10 @@ func splashScreen() string {
 
 // HasString returns true if a string contains another string
 func HasString(str, match string) bool {
-	bool, _ := regexp.MatchString(match, str)
+	bool, err := regexp.MatchString(match, str)
+	if err != nil {
+		return false
+	}
 	return bool
 }
 
