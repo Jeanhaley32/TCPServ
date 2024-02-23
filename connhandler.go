@@ -230,6 +230,11 @@ func connHandler(conn ConnectionHandler) {
 				payload: payload(corgi),
 				msgType: System,
 			})
+		case HasString(m.GetPayload().String(), "gnome"):
+			Client.WriteToChannel(msg{
+				payload: payload(gnome),
+				msgType: System,
+			})
 		}
 		m.SetPayload(
 			payload(

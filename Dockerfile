@@ -28,4 +28,4 @@ EXPOSE $PORT
 WORKDIR /app/
 
 # Run App with port flag
-CMD ["sh", "-c", "/app/tcpserv --port=${PORT}"]
+CMD ["sh", "-c", "/app/tcpserv", "--port=$PORT"]
